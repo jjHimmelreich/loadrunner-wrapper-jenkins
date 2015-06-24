@@ -11,27 +11,27 @@
     When submitted, it will be passed to the corresponding constructor parameter.
   -->
   <f:entry title="LoadRunner installation folder" field="loadRunnerBin">
-    <f:textbox value="C:\\Program Files (x86)\\HP\\LoadRunner\\bin"/>
+    <f:textbox default="C:\\Program Files (x86)\\HP\\LoadRunner\\bin"/>
   </f:entry>
 
   <f:entry title="LoadRunner scenario file" field="loadRunnerScenario">
-    <f:textbox value="C:\\Program Files (x86)\\HP\\LoadRunner\\scenario\\Scenario1.lrs"/>
+    <f:textbox default="C:\\Program Files (x86)\\HP\\LoadRunner\\scenario\\Scenario1.lrs"/>
   </f:entry>
 
   <f:entry title="Runtime Additional Attributes" field="loadRunnerControllerAdditionalAttributes">
-    <f:textbox value=""/>
+    <f:textbox default=""/>
   </f:entry>
 
   <f:entry title="LoadRunner script results folder" field="loadRunnerResultsFolder">
-    <f:textbox value="%WORKSPACE%\\%BUILD_NUMBER%"/>
+    <f:textbox default="%WORKSPACE%\\%BUILD_NUMBER%"/>
   </f:entry>
 
   <f:entry title="LoadRunner Analysis Template" field="loadRunnerAnalysisTemplateName">
-    <f:textbox value="DefaultTemplate1"/>
+    <f:textbox default="DefaultTemplate1"/>
   </f:entry>
 
   <f:entry title="LoadRunner Analysis HTML report folder" field="loadRunnerAnalysisHTMLReportFolder">
-    <f:textbox value="%WORKSPACE%\\%BUILD_NUMBER%\\An_Report1"/>
+    <f:textbox default="%WORKSPACE%\\%BUILD_NUMBER%\\An_Report1"/>
   </f:entry>
 
   <f:entry name="loadRunnerResultsSummaryFileFormat" title="LoadRunner Wrapper Summary Format" field="loadRunnerResultsSummaryFileFormat">
