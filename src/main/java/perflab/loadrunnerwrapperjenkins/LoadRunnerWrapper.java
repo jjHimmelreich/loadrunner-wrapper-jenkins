@@ -82,15 +82,30 @@ public class LoadRunnerWrapper {
 		startTime = new Date();
 
 		/* Run controller */
-		// "c:\Program Files
-		// (x86)\HP\LoadRunner\bin\Wlrun.exe" -Run -TestPath "C:\Program Files
-		// (x86)\HP\LoadRunner\scenario\Scenario1.lrs" -ResultName "C:\Jenkins\workspace\RunLoadrunner\44"
+		// "c:\Program Files(x86)\HP\LoadRunner\bin\Wlrun.exe" -Run -TestPath "C:\Program Files(x86)\HP\LoadRunner\scenario\Scenario1.lrs" -ResultName "C:\Jenkins\workspace\RunLoadrunner\44"
 
-		StringBuilder sb = new StringBuilder("\"").append(loadRunnerBin)
-				.append("\\").append("Wlrun.exe").append("\"").append(" -Run ")
-				.append(" -TestPath ").append("\"").append(loadRunnerScenario)
-				.append("\"").append(" -ResultName ")
-				.append(loadRunnerResultsFolder);
+		//Check if lrs exists
+		boolean lrsExists = checkIfScenarioExists();
+        if(!lrsExists) {
+            logger.println("[ERROR] Scenario file " + this.loadRunnerScenario + " was not found on slave. Aborting job");
+            System.out.println("[ERROR] Scenario file " + this.loadRunnerScenario + " was not found on slave. Aborting job");
+            okay = false;
+            return okay;
+        }
+
+		//Check if Analysis template exists
+		boolean analysisTemplateExists = checkIfTemplateExists();
+        if(!analysisTemplateExists) {
+            logger.println("[ERROR] Analysis Template " + this.loadRunnerScenario + " was not found on slave. Aborting job");
+            System.out.println("[ERROR] Scenario file " + this.loadRunnerScenario + " was not found on slave. Aborting job");
+            okay = false;
+            return okay;
+        }
+
+		StringBuilder sb = new StringBuilder("\"").append(loadRunnerBin).append("\\").append("Wlrun.exe").append("\"")
+                .append(" -Run ")
+				.append(" -TestPath ").append("\"").append(loadRunnerScenario).append("\"")
+                .append(" -ResultName ").append("\"").append(loadRunnerResultsFolder).append("\"");
 
 		if (loadRunnerControllerAdditionalAttributes != null && !loadRunnerControllerAdditionalAttributes.isEmpty()) {
 			sb.append(" ").append(loadRunnerControllerAdditionalAttributes);
@@ -98,23 +113,25 @@ public class LoadRunnerWrapper {
 
 		String controllerCommand = sb.toString();
 
-		// String controllerCommand = "\"" + loadRunnerBin +
-		// "\\Wlrun.exe\" -Run -TestPath \"" + loadRunnerScenario +
-		// "\" -ResultName " + loadRunnerResultsFolder + " " +
-		// loadRunnerControllerAdditionalAttributes;
-		// Wlrun.exe -Run -TestPath scenario.lrs -ResultName res_folder
-		// -InvokeAnalysis
+		// String controllerCommand = "\"" + loadRunnerBin + "\\Wlrun.exe\" -Run -TestPath \"" + loadRunnerScenario + "\" -ResultName " + loadRunnerResultsFolder + " " + loadRunnerControllerAdditionalAttributes;
+		// Wlrun.exe -Run -TestPath scenario.lrs -ResultName res_folder -InvokeAnalysis
 
 		int controllerRC = runCommand(controllerCommand);
 
 		if (controllerRC != -1) {
 			/* Run Analysis if controller return code is okay */
-			// "c:\Program Files\Mercury\LoadRunner\bin\AnalysisUI.exe"
-			// -RESULTPATH C:\Temp\30users\30users.lrr -TEMPLATENAME
+			// "c:\Program Files\Mercury\LoadRunner\bin\AnalysisUI.exe" -RESULTPATH C:\Temp\30users\30users.lrr -TEMPLATENAME
 			// WinResTemplate
-			String resultsfile = getResultsFile(loadRunnerResultsFolder);
+			String resultsFile = getResultsFile(loadRunnerResultsFolder);
 
-			String analysisCommand = "\"" + loadRunnerBin + "\\AnalysisUI.exe\" " + " -RESULTPATH " + resultsfile;
+            if(resultsFile.isEmpty()){
+                logger.println("[ERROR] Analysis session file (.lrr) was not  found in "+ loadRunnerResultsFolder + " folder. Aborting job");
+                System.out.println("[ERROR] Analysis session file (.lrr) was not  found in " + loadRunnerResultsFolder + " folder. Aborting job");
+                okay = false;
+                return okay;
+            }
+
+			String analysisCommand = "\"" + loadRunnerBin + "\\AnalysisUI.exe\" " + " -RESULTPATH " + resultsFile;
 
 			if (loadRunnerAnalysisTemplateName != null && !loadRunnerAnalysisTemplateName.isEmpty()) {
 				analysisCommand = analysisCommand + " -TEMPLATENAME " + loadRunnerAnalysisTemplateName;
@@ -135,6 +152,28 @@ public class LoadRunnerWrapper {
 			System.out.println("Controller failed. Exit code is: " + controllerRC);
 			okay = false;
 		}
+		return okay;
+	}
+
+    private boolean checkIfTemplateExists() {
+        boolean okay = false;
+
+        File template=new File(System.getenv("LR_PATH") + "\\AnalysisTemplates\\" + this.loadRunnerAnalysisTemplateName);
+        if (template.exists() && template.isDirectory()) {
+            okay = true;
+        }
+        return okay;
+    }
+
+
+    private boolean checkIfScenarioExists() {
+		boolean okay = false;
+
+		File lrs=new File(this.loadRunnerScenario);
+		if (lrs.exists() && !lrs.isDirectory()) {
+			okay = true;
+		}
+
 		return okay;
 	}
 
@@ -166,7 +205,7 @@ public class LoadRunnerWrapper {
 				FileFilter fileFilter = new WildcardFileFilter(pattern);
 				File[] files = dir.listFiles(fileFilter);
 
-				logger.println("Length: " + files.length);
+				//logger.println("Length: " + files.length);
 
 				foundFile = files[0].getAbsolutePath();
 			} else if (dir.isFile()) {
@@ -213,17 +252,11 @@ public class LoadRunnerWrapper {
 		parseSummaryFile(htmlReportFolder + "\\summary.html", loadRunnerResultsSummaryFile);		
 
 		if (this.loadRunnerResultsSummaryFileFormat.equals("PerfPublisherReport")) {
-
 			summaryString = generatePerfPublisherReport(this.transactions);
-
 		} else if (this.loadRunnerResultsSummaryFileFormat.equals("PlotCSVReport")) {
-
 			summaryString = generatePlotCSVReport(this.transactions);
-
 		} else if (this.loadRunnerResultsSummaryFileFormat.equals("jUnitReport")) {
-
 			summaryString = generatejUnitReport(this.transactions);
-
 		}
 
 		try {
@@ -236,7 +269,6 @@ public class LoadRunnerWrapper {
 			logger.println("Can't write custom csv report for plotting "
 					+ e.getMessage());
 		}
-
 	}
 
 	/**
@@ -295,7 +327,7 @@ public class LoadRunnerWrapper {
 		logger.println("Transformation to jUnit XML started ...");
 		try {
 			/*
-			 * http://llg.cubic.org/docs/junit/ 
+			 * http://llg.cubic.org/docs/junit/
 			 *<testsuite tests="3" time="42.5"> 
 			 * 	<testcase classname="ZZZ_1" name="ZZZ_1" time="10.1"/>
 			 *  <testcase classname="ZZZ_2" name="ZZZ_2" time="11.7"/>
@@ -322,7 +354,8 @@ public class LoadRunnerWrapper {
 				logger.println("Dump " + tr.getName());
 
 				org.w3c.dom.Element testcaseElement = doc.createElement("testcase");
-				testcaseElement.setAttribute("classname", tr.getName());
+				//testcaseElement.setAttribute("classname", tr.getName());
+                testcaseElement.setAttribute("classname", "load." + new File(this.loadRunnerScenario).getName().replace(".lrs",""));
 				testcaseElement.setAttribute("name", tr.getName());
 				testcaseElement.setAttribute("time", String.valueOf(tr.getAvgRT()));
 

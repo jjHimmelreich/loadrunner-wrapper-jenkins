@@ -15,6 +15,7 @@ import hudson.util.FormValidation;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.apache.commons.lang.StringUtils;
 import org.jenkinsci.remoting.RoleChecker;
+import org.jfree.util.Log;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
@@ -191,7 +192,7 @@ public class LoadRunnerWrapperJenkins extends Builder {
 	        this.loadRunnerAnalysisTemplateName = loadRunnerAnalysisTemplateName;	
 	        this.loadRunnerResultsSummaryFileFormat = loadRunnerResultsSummaryFileFormat;
 		}
-     };
+     }
     
     
     @Override
@@ -206,13 +207,13 @@ public class LoadRunnerWrapperJenkins extends Builder {
     		LauncherCallable remoteLauncher = new LauncherCallable(listener);
     		
     		if (this.loadRunnerResultsSummaryFileFormat.equals("PerfPublisherReport")){
-    			loadRunnerResultsSummaryFile = "%WORKSPACE%\\lr_summary_PerfPublisher.xml";    			
-    		}else if(this.loadRunnerResultsSummaryFileFormat.equals("PlotCSVReport")){    			
-    			loadRunnerResultsSummaryFile = "%WORKSPACE%\\lr_summary_PlotCSV.csv";    			
-    		}else if(this.loadRunnerResultsSummaryFileFormat.equals("jUnitReport")){    			
-    			loadRunnerResultsSummaryFile = "%WORKSPACE%\\lr_summary_jUnit.xml";   			
+    			loadRunnerResultsSummaryFile = "%WORKSPACE%\\lr_summary_PerfPublisher.xml";
+    		}else if(this.loadRunnerResultsSummaryFileFormat.equals("PlotCSVReport")){
+    			loadRunnerResultsSummaryFile = "%WORKSPACE%\\lr_summary_PlotCSV.csv";
+    		}else if(this.loadRunnerResultsSummaryFileFormat.equals("jUnitReport")){
+    			loadRunnerResultsSummaryFile = "%WORKSPACE%\\lr_summary_jUnit.xml";
     		}    		    		
-    		
+
     		String buildNumber =  String.valueOf(build.getNumber());
     		String workspacePath = StringEscapeUtils.escapeJava(build.getWorkspace().toString()); 
     		
@@ -249,12 +250,16 @@ public class LoadRunnerWrapperJenkins extends Builder {
     }
 
     private String interpolatePath(String pathToInterpolate, String pattern, String replacement) {
-    	
+
+        String dbgMessage = "Interpolating " + pathToInterpolate + " replace " + pattern + " with " + replacement;
+
     	String interpolatedString = pathToInterpolate;//.replaceAll("\\", "\\\\");
     	
 		interpolatedString = interpolatedString.replaceAll("%"+pattern+"%", replacement);
 		interpolatedString = interpolatedString.replaceAll("\\$\\{"+pattern+"\\}", replacement);
-		
+
+        Log.debug(dbgMessage + " = " + interpolatedString);
+
 		return interpolatedString;		
 	}
 
