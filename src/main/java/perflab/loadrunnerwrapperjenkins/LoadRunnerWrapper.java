@@ -97,7 +97,7 @@ public class LoadRunnerWrapper {
 		boolean analysisTemplateExists = checkIfTemplateExists();
         if(!analysisTemplateExists) {
             logger.println("[ERROR] Analysis Template " + this.loadRunnerScenario + " was not found on slave. Aborting job");
-            System.out.println("[ERROR] Scenario file " + this.loadRunnerScenario + " was not found on slave. Aborting job");
+            System.out.println("[ERROR] Analysis Template " + this.loadRunnerScenario + " was not found on slave. Aborting job");
             okay = false;
             return okay;
         }
