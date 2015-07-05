@@ -93,14 +93,26 @@ public class LoadRunnerWrapper {
             return okay;
         }
 
+        //Check if the LRS has all necessary flags
+		if (!isLRSWellConfigured()){
+			okay = false;
+			return okay;
+		}
+
 		//Check if Analysis template exists
 		boolean analysisTemplateExists = checkIfTemplateExists();
         if(!analysisTemplateExists) {
             logger.println("[ERROR] Analysis Template " + this.loadRunnerScenario + " was not found on slave. Aborting job");
-            System.out.println("[ERROR] Scenario file " + this.loadRunnerScenario + " was not found on slave. Aborting job");
+            System.out.println("[ERROR] Analysis Template " + this.loadRunnerScenario + " was not found on slave. Aborting job");
             okay = false;
             return okay;
         }
+
+        //Check if the Analysis template has all necessary flags
+		if (!isTemplateWellConfigured()){
+			okay = false;
+			return okay;
+		}
 
 		StringBuilder sb = new StringBuilder("\"").append(loadRunnerBin).append("\\").append("Wlrun.exe").append("\"")
                 .append(" -Run ")
@@ -172,6 +184,79 @@ public class LoadRunnerWrapper {
 		File lrs=new File(this.loadRunnerScenario);
 		if (lrs.exists() && !lrs.isDirectory()) {
 			okay = true;
+		}
+
+		return okay;
+	}
+
+	private boolean isLRSWellConfigured(){
+		boolean okay = false;
+
+		try {
+			BufferedReader bufferedReader = new BufferedReader(new FileReader(this.loadRunnerScenario));
+			String line = null;
+			boolean AutoSetResults=false;
+			boolean AutoOverwriteResults=false;
+
+			while ((line = bufferedReader.readLine()) != null) {
+				if (line.contains("AutoSetResults=0")) AutoSetResults=true;
+				if (line.contains("AutoOverwriteResults=0")) AutoOverwriteResults=true;
+			}
+			if(AutoSetResults && AutoOverwriteResults) {
+				okay=true;
+			}else {
+				if (!AutoSetResults) {
+					logger.println("[ERROR] Scenario file " + this.loadRunnerScenario + " AutoSetResults is missing from the lrs . Aborting job");
+					System.out.println("[ERROR] Scenario file " + this.loadRunnerScenario + " AutoSetResults is missing from the lrs . Aborting job");
+				}
+				if (!AutoOverwriteResults) {
+					logger.println("[ERROR] Scenario file " + this.loadRunnerScenario + " AutoOverwriteResults is missing from the lrs . Aborting job");
+					System.out.println("[ERROR] Scenario file " + this.loadRunnerScenario + " AutoOverwriteResultsl is missing from the lrs . Aborting job");
+				}
+				okay = false;
+			}
+		} catch (Exception e) {
+			logger.println("Error on lrs file " + e.getMessage());
+		}
+
+		return okay;
+	}
+
+	private boolean isTemplateWellConfigured(){
+		boolean okay = false;
+
+		File template=new File(System.getenv("LR_PATH") + "\\AnalysisTemplates\\" + this.loadRunnerAnalysisTemplateName + "\\" + this.loadRunnerAnalysisTemplateName + ".tem");
+		try {
+			BufferedReader bufferedReader = new BufferedReader(new FileReader(template));
+			String line = null;
+			boolean AutoHtml=false;
+			boolean AutoSave=false;
+			boolean AutoClose=false;
+
+			while ((line = bufferedReader.readLine()) != null) {
+				if (line.contains("AutoHtml=1")) AutoHtml=true;
+				if (line.contains("AutoSave=1")) AutoSave=true;
+				if (line.contains("AutoClose=1")) AutoClose=true;
+			}
+			if(AutoHtml && AutoSave && AutoClose) {
+				okay=true;
+			}else {
+				if (!AutoHtml) {
+					logger.println("[ERROR] Analysis Template " + this.loadRunnerAnalysisTemplateName + " AutoHtml is missing from the template . Aborting job");
+					System.out.println("[ERROR] Analysis Template " + this.loadRunnerAnalysisTemplateName + " AutoHtml is missing from the template . Aborting job");
+				}
+				if (!AutoClose) {
+					logger.println("[ERROR] Analysis Template " + this.loadRunnerAnalysisTemplateName + " AutoClose is missing from the template . Aborting job");
+					System.out.println("[ERROR] Analysis Template " + this.loadRunnerAnalysisTemplateName + " AutoClose is missing from the template . Aborting job");
+				}
+				if (!AutoSave) {
+					logger.println("[ERROR] Analysis Template " + this.loadRunnerAnalysisTemplateName + " AutoSave is missing from the template . Aborting job");
+					System.out.println("[ERROR] Analysis Template " + this.loadRunnerAnalysisTemplateName + " AutoSave is missing from the template . Aborting job");
+				}
+				okay = false;
+			}
+		} catch (Exception e) {
+			logger.println("Can't find template file " + e.getMessage());
 		}
 
 		return okay;
