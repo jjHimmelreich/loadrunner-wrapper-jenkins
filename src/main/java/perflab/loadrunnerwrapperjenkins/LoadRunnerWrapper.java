@@ -18,9 +18,9 @@ package perflab.loadrunnerwrapperjenkins;
 
 import java.io.*;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
+import java.util.*;
 
+import org.jfree.util.Log;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -52,18 +52,21 @@ public class LoadRunnerWrapper {
 	private ArrayList<LoadRunnerTransaction> transactions = new ArrayList<LoadRunnerTransaction>();
 	private Date startTime;
 	private PrintStream logger;
+    private HashMap<String, Pair> LRSFlags;
+    private HashMap<String, Pair> AnalysisTemplatesFlags;
+
 
 	/**
 	 * @param printStream
 	 * @parameter default-value="${basedir}"
 	 */
 	public LoadRunnerWrapper(String loadRunnerBin, String loadRunnerScenario,
-			String loadRunnerControllerAdditionalAttributes,
-			String loadRunnerResultsFolder,
-			String loadRunnerAnalysisTemplateName,
-			String loadRunnerAnalysisHTMLReportFolder,
-			String loadRunnerResultsSummaryFile,
-			String loadRunnerResultsSummaryFileFormat, PrintStream logger) {
+        String loadRunnerControllerAdditionalAttributes,
+        String loadRunnerResultsFolder,
+        String loadRunnerAnalysisTemplateName,
+        String loadRunnerAnalysisHTMLReportFolder,
+        String loadRunnerResultsSummaryFile,
+        String loadRunnerResultsSummaryFileFormat, PrintStream logger) {
 		this.loadRunnerBin = loadRunnerBin;
 		this.loadRunnerScenario = loadRunnerScenario;
 		this.loadRunnerResultsFolder = loadRunnerResultsFolder;
@@ -73,7 +76,19 @@ public class LoadRunnerWrapper {
 		this.loadRunnerAnalysisTemplateName = loadRunnerAnalysisTemplateName;
 		this.loadRunnerResultsSummaryFileFormat = loadRunnerResultsSummaryFileFormat;
 		this.logger = logger;
-	}
+        LRSFlags = new HashMap<String, Pair>();
+        AnalysisTemplatesFlags = new HashMap<String, Pair>();
+        setFlags();
+    }
+
+    private void setFlags(){
+        LRSFlags.put("AutoSetResults",new Pair("0",false));
+        LRSFlags.put("AutoOverwriteResults",new Pair("0",false));
+
+        AnalysisTemplatesFlags.put("AutoHtml",new Pair("1",false));
+        AnalysisTemplatesFlags.put("AutoSave",new Pair("1",false));
+        AnalysisTemplatesFlags.put("AutoClose", new Pair("1", false));
+    }
 
 	public boolean execute() {
 
@@ -93,11 +108,10 @@ public class LoadRunnerWrapper {
             return okay;
         }
 
-        //Check if the LRS has all necessary flags
-		if (!isLRSWellConfigured()){
-			okay = false;
-			return okay;
-		}
+        if (!isFileWellConfigured(this.loadRunnerScenario, LRSFlags)){
+            okay = false;
+            return okay;
+        }
 
 		//Check if Analysis template exists
 		boolean analysisTemplateExists = checkIfTemplateExists();
@@ -108,11 +122,11 @@ public class LoadRunnerWrapper {
             return okay;
         }
 
-        //Check if the Analysis template has all necessary flags
-		if (!isTemplateWellConfigured()){
-			okay = false;
-			return okay;
-		}
+        String templateName = System.getenv("LR_PATH") + "\\AnalysisTemplates\\" + this.loadRunnerAnalysisTemplateName + "\\" + this.loadRunnerAnalysisTemplateName + ".tem";
+        if (!isFileWellConfigured(templateName, AnalysisTemplatesFlags)){
+            okay = false;
+            return okay;
+        }
 
 		StringBuilder sb = new StringBuilder("\"").append(loadRunnerBin).append("\\").append("Wlrun.exe").append("\"")
                 .append(" -Run ")
@@ -189,228 +203,180 @@ public class LoadRunnerWrapper {
 		return okay;
 	}
 
-	private boolean isLRSWellConfigured(){
-		boolean okay = false;
 
-		try {
-			BufferedReader bufferedReader = new BufferedReader(new FileReader(this.loadRunnerScenario));
-			String line = null;
-			boolean AutoSetResults=false;
-			boolean AutoOverwriteResults=false;
+    private boolean isFileWellConfigured(String fileName, HashMap map) {
+        boolean okay = true;
 
-			while ((line = bufferedReader.readLine()) != null) {
-				if (line.contains("AutoSetResults=0")) AutoSetResults=true;
-				if (line.contains("AutoOverwriteResults=0")) AutoOverwriteResults=true;
-			}
-			if(AutoSetResults && AutoOverwriteResults) {
-				okay=true;
-			}else {
-				if (!AutoSetResults) {
-					logger.println("[ERROR] Scenario file " + this.loadRunnerScenario + " AutoSetResults is missing from the lrs . Aborting job");
-					System.out.println("[ERROR] Scenario file " + this.loadRunnerScenario + " AutoSetResults is missing from the lrs . Aborting job");
-				}
-				if (!AutoOverwriteResults) {
-					logger.println("[ERROR] Scenario file " + this.loadRunnerScenario + " AutoOverwriteResults is missing from the lrs . Aborting job");
-					System.out.println("[ERROR] Scenario file " + this.loadRunnerScenario + " AutoOverwriteResultsl is missing from the lrs . Aborting job");
-				}
-				okay = false;
-			}
-		} catch (Exception e) {
-			logger.println("Error on lrs file " + e.getMessage());
-		}
+        String value;
+        String flag;
 
-		return okay;
-	}
+        try {
+            String fileContent = FileUtils.readFileToString(new File(fileName));
 
-	private boolean isTemplateWellConfigured(){
-		boolean okay = false;
+            for (Object key : map.keySet()){
+                String keyStr = key.toString();
 
-		File template=new File(System.getenv("LR_PATH") + "\\AnalysisTemplates\\" + this.loadRunnerAnalysisTemplateName + "\\" + this.loadRunnerAnalysisTemplateName + ".tem");
-		try {
-			BufferedReader bufferedReader = new BufferedReader(new FileReader(template));
-			String line = null;
-			boolean AutoHtml=false;
-			boolean AutoSave=false;
-			boolean AutoClose=false;
+                Pair p = (Pair)map.get(key);
+                String strToFind = keyStr + "=" + p.getValue();
 
-			while ((line = bufferedReader.readLine()) != null) {
-				if (line.contains("AutoHtml=1")) AutoHtml=true;
-				if (line.contains("AutoSave=1")) AutoSave=true;
-				if (line.contains("AutoClose=1")) AutoClose=true;
-			}
-			if(AutoHtml && AutoSave && AutoClose) {
-				okay=true;
-			}else {
-				if (!AutoHtml) {
-					logger.println("[ERROR] Analysis Template " + this.loadRunnerAnalysisTemplateName + " AutoHtml is missing from the template . Aborting job");
-					System.out.println("[ERROR] Analysis Template " + this.loadRunnerAnalysisTemplateName + " AutoHtml is missing from the template . Aborting job");
-				}
-				if (!AutoClose) {
-					logger.println("[ERROR] Analysis Template " + this.loadRunnerAnalysisTemplateName + " AutoClose is missing from the template . Aborting job");
-					System.out.println("[ERROR] Analysis Template " + this.loadRunnerAnalysisTemplateName + " AutoClose is missing from the template . Aborting job");
-				}
-				if (!AutoSave) {
-					logger.println("[ERROR] Analysis Template " + this.loadRunnerAnalysisTemplateName + " AutoSave is missing from the template . Aborting job");
-					System.out.println("[ERROR] Analysis Template " + this.loadRunnerAnalysisTemplateName + " AutoSave is missing from the template . Aborting job");
-				}
-				okay = false;
-			}
-		} catch (Exception e) {
-			logger.println("Can't find template file " + e.getMessage());
-		}
+                if (!fileContent.contains(strToFind)){
+                    okay  = false;
+                    logger.println("[ERROR] " + fileName + ":" + strToFind + "  is missing or misconfigured . Aborting job");
+                    System.out.println("[ERROR] " + fileName + ":" + strToFind + "  is missing or misconfigured . Aborting job");
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return okay;
+    }
 
-		return okay;
-	}
+        /**
+         * @param resultsFolder
+         * @return name of lrr file name in results folder
+         */
 
-	/**
-	 * @param resultsFolder
-	 * @return name of lrr file name in results folder
-	 */
-	private String getResultsFile(String resultsFolder) {
+    private String getResultsFile(String resultsFolder) {
 
-		logger.println("Looking for lrr file in " + resultsFolder);
+        logger.println("Looking for lrr file in " + resultsFolder);
 
-		String lrrFile = findFilebyRegex(resultsFolder, "*.lrr");
+        String lrrFile = findFilebyRegex(resultsFolder, "*.lrr");
 
-		return lrrFile;
-	}
+        return lrrFile;
+    }
 
-	/**
-	 * @param path
-	 * @param pattern
-	 * @return first file according to the pattern
-	 */
-	private String findFilebyRegex(String path, String pattern) {
-		String foundFile = "";
+    /**
+     * @param path
+     * @param pattern
+     * @return first file according to the pattern
+     */
+    private String findFilebyRegex(String path, String pattern) {
+        String foundFile = "";
 
-		try {
+        try {
 
-			File dir = new File(path);
-			if (dir.exists() && dir.isDirectory()) {
-				FileFilter fileFilter = new WildcardFileFilter(pattern);
-				File[] files = dir.listFiles(fileFilter);
+            File dir = new File(path);
+            if (dir.exists() && dir.isDirectory()) {
+                FileFilter fileFilter = new WildcardFileFilter(pattern);
+                File[] files = dir.listFiles(fileFilter);
 
-				//logger.println("Length: " + files.length);
+                //logger.println("Length: " + files.length);
 
-				foundFile = files[0].getAbsolutePath();
-			} else if (dir.isFile()) {
-				logger.println(path + " not exists or not a folder...");
-			}
+                foundFile = files[0].getAbsolutePath();
+            } else if (dir.isFile()) {
+                logger.println(path + " not exists or not a folder...");
+            }
 
-		} catch (Exception e) {
-			logger.println("Can't find lrr file " + e.getMessage());
-		}
-		return foundFile;
-	}
+        } catch (Exception e) {
+            logger.println("Can't find lrr file " + e.getMessage());
+        }
+        return foundFile;
+    }
 
-	/**
-	 * @param command
-	 *            - command to execute
-	 * @return command exit code
-	 */
-	private int runCommand(String command) {
-		int exitCode = -1;
-		logger.println("Command to run: " + command);
+    /**
+     * @param command - command to execute
+     * @return command exit code
+     */
+    private int runCommand(String command) {
+        int exitCode = -1;
+        logger.println("Command to run: " + command);
 
-		try {
-			Process p = Runtime.getRuntime().exec(command);
-			p.waitFor();
-			exitCode = p.exitValue();
-		} catch (Exception err) {
-			err.printStackTrace();
-		}
+        try {
+            Process p = Runtime.getRuntime().exec(command);
+            p.waitFor();
+            exitCode = p.exitValue();
+        } catch (Exception err) {
+            err.printStackTrace();
+        }
 
-		// getLog().info("Exit value: " + exitCode);
-		return exitCode;
-	}
+        // getLog().info("Exit value: " + exitCode);
+        return exitCode;
+    }
 
-	/**
-	 * Generates report in format expected by
-	 * https://wiki.jenkins-ci.org/display/JENKINS/PerfPublisher+Plugin examples
-	 * here: file:///C:/Users/i046774/Downloads/master-s-thesis-designing-and-
-	 * automating-dynamic-testing-of-software-nightly-builds.pdf
-	 * */
-	protected void extractKPIs(String resultsFolder, String htmlReportFolder) {
-		
-		String summaryString = "";
-		
-		parseSummaryFile(htmlReportFolder + "\\summary.html", loadRunnerResultsSummaryFile);		
+    /**
+     * Generates report in format expected by
+     * https://wiki.jenkins-ci.org/display/JENKINS/PerfPublisher+Plugin examples
+     * here: file:///C:/Users/i046774/Downloads/master-s-thesis-designing-and-
+     * automating-dynamic-testing-of-software-nightly-builds.pdf
+     */
+    protected void extractKPIs(String resultsFolder, String htmlReportFolder) {
 
-		if (this.loadRunnerResultsSummaryFileFormat.equals("PerfPublisherReport")) {
-			summaryString = generatePerfPublisherReport(this.transactions);
-		} else if (this.loadRunnerResultsSummaryFileFormat.equals("PlotCSVReport")) {
-			summaryString = generatePlotCSVReport(this.transactions);
-		} else if (this.loadRunnerResultsSummaryFileFormat.equals("jUnitReport")) {
-			summaryString = generatejUnitReport(this.transactions);
-		}
+        String summaryString = "";
 
-		try {
-			FileUtils.writeStringToFile(new File(loadRunnerResultsSummaryFile),
-					summaryString);
-			logger.println(summaryString);
-			logger.println("Report is saved to " + loadRunnerResultsSummaryFile);
-		} catch (IOException e) {
-			e.printStackTrace();
-			logger.println("Can't write custom csv report for plotting "
-					+ e.getMessage());
-		}
-	}
+        parseSummaryFile(htmlReportFolder + "\\summary.html", loadRunnerResultsSummaryFile);
 
-	/**
-	 * @param htmlSummaryFile
-	 *            - load runner analysis html report file to parse
-	 * @param summaryFile
-	 *            - location of summary file to be generated out of loadrunner
-	 *            html analysis
-	 */
-	protected void parseSummaryFile(String htmlSummaryFile, String summaryFile) {
-		try {
+        if (this.loadRunnerResultsSummaryFileFormat.equals("PerfPublisherReport")) {
+            summaryString = generatePerfPublisherReport(this.transactions);
+        } else if (this.loadRunnerResultsSummaryFileFormat.equals("PlotCSVReport")) {
+            summaryString = generatePlotCSVReport(this.transactions);
+        } else if (this.loadRunnerResultsSummaryFileFormat.equals("jUnitReport")) {
+            summaryString = generatejUnitReport(this.transactions);
+        }
 
-			File input = new File(htmlSummaryFile);
-			Document document = Jsoup.parse(input, "UTF-8");
-			Document parse = Jsoup.parse(document.html());
-			Elements table = parse.select("table").select(
-					"[summary=Transactions statistics summary table]");
-			Elements rows = table.select("tr");
+        try {
+            FileUtils.writeStringToFile(new File(loadRunnerResultsSummaryFile),
+                    summaryString);
+            logger.println(summaryString);
+            logger.println("Report is saved to " + loadRunnerResultsSummaryFile);
+        } catch (IOException e) {
+            e.printStackTrace();
+            logger.println("Can't write custom csv report for plotting "
+                    + e.getMessage());
+        }
+    }
 
-			logger.println("number of rows in summary file=" + rows.size());
+    /**
+     * @param htmlSummaryFile - load runner analysis html report file to parse
+     * @param summaryFile     - location of summary file to be generated out of loadrunner
+     *                        html analysis
+     */
+    protected void parseSummaryFile(String htmlSummaryFile, String summaryFile) {
+        try {
 
-			for (Element row : rows) {
+            File input = new File(htmlSummaryFile);
+            Document document = Jsoup.parse(input, "UTF-8");
+            Document parse = Jsoup.parse(document.html());
+            Elements table = parse.select("table").select(
+                    "[summary=Transactions statistics summary table]");
+            Elements rows = table.select("tr");
 
-				// logger.println("table element = " + row.toString());
+            logger.println("number of rows in summary file=" + rows.size());
 
-				String name = row.select("td[headers=LraTransaction Name]")
-						.select("span").text();
+            for (Element row : rows) {
 
-				if (!name.isEmpty()) {
+                // logger.println("table element = " + row.toString());
 
-					float avgRT = Float.valueOf(row.select("td[headers=LraAverage]").select("span").text());
-					float minRT = Float.valueOf(row.select("td[headers=LraMinimum]").select("span").text());
-					float maxRT = Float.valueOf(row.select("td[headers=LraMaximum]").select("span").text());
-					int passed = Integer.valueOf(row.select("td[headers=LraPass]").select("span").text().replace(".", "").replace(",", ""));
-					int failed = Integer.valueOf(row.select("td[headers=LraFail]").select("span").text().replace(".", "").replace(",", ""));
+                String name = row.select("td[headers=LraTransaction Name]")
+                        .select("span").text();
 
-					// logger.println("Saving Transaction [" + name + "]");
-					this.transactions.add(new LoadRunnerTransaction(name, minRT, avgRT, maxRT, passed, failed));
-				}
-			}
+                if (!name.isEmpty()) {
 
-		} catch (IOException e) {
-			logger.println("Can't read LoadRunner Analysis html report " + e.getMessage());
-		}
+                    float avgRT = Float.valueOf(row.select("td[headers=LraAverage]").select("span").text());
+                    float minRT = Float.valueOf(row.select("td[headers=LraMinimum]").select("span").text());
+                    float maxRT = Float.valueOf(row.select("td[headers=LraMaximum]").select("span").text());
+                    int passed = Integer.valueOf(row.select("td[headers=LraPass]").select("span").text().replace(".", "").replace(",", ""));
+                    int failed = Integer.valueOf(row.select("td[headers=LraFail]").select("span").text().replace(".", "").replace(",", ""));
 
-	}
+                    // logger.println("Saving Transaction [" + name + "]");
+                    this.transactions.add(new LoadRunnerTransaction(name, minRT, avgRT, maxRT, passed, failed));
+                }
+            }
 
-	/**
-	 * @param transactions
-	 *            - ArrayList of LoadRunnerTransaction objects
-	 * @return
-	 */
-	private String generatejUnitReport(
-			ArrayList<LoadRunnerTransaction> transactions) {
-		String stringReport = "";
-		logger.println("Transformation to jUnit XML started ...");
-		try {
+        } catch (IOException e) {
+            logger.println("Can't read LoadRunner Analysis html report " + e.getMessage());
+        }
+
+    }
+
+    /**
+     * @param transactions - ArrayList of LoadRunnerTransaction objects
+     * @return
+     */
+    private String generatejUnitReport(
+            ArrayList<LoadRunnerTransaction> transactions) {
+        String stringReport = "";
+        logger.println("Transformation to jUnit XML started ...");
+        try {
 			/*
 			 * http://llg.cubic.org/docs/junit/
 			 *<testsuite tests="3" time="42.5"> 
@@ -422,238 +388,264 @@ public class LoadRunnerWrapper {
 			 *</testsuite>
 			 */
 
-			DocumentBuilderFactory docFactory = DocumentBuilderFactory.newInstance();
-			DocumentBuilder docBuilder = docFactory.newDocumentBuilder();
+            DocumentBuilderFactory docFactory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder docBuilder = docFactory.newDocumentBuilder();
 
-			// root elements
-			org.w3c.dom.Document doc = (org.w3c.dom.Document) docBuilder.newDocument();
-			org.w3c.dom.Element testsuiteElement = (org.w3c.dom.Element) doc.createElement("testsuite");
-			testsuiteElement.setAttribute("tests", String.valueOf(transactions.size()));
-			// testsuiteElement.setAttribute("time", "total test duration");
-			doc.appendChild(testsuiteElement);
+            // root elements
+            org.w3c.dom.Document doc = (org.w3c.dom.Document) docBuilder.newDocument();
+            org.w3c.dom.Element testsuiteElement = (org.w3c.dom.Element) doc.createElement("testsuite");
+            testsuiteElement.setAttribute("tests", String.valueOf(transactions.size()));
+            // testsuiteElement.setAttribute("time", "total test duration");
+            doc.appendChild(testsuiteElement);
 
-			// //////////////////////////////////////////////////////////////////////////
+            // //////////////////////////////////////////////////////////////////////////
 
-			for (LoadRunnerTransaction tr : this.transactions) {
+            for (LoadRunnerTransaction tr : this.transactions) {
 
-				logger.println("Dump " + tr.getName());
+                logger.println("Dump " + tr.getName());
 
-				org.w3c.dom.Element testcaseElement = doc.createElement("testcase");
-				//testcaseElement.setAttribute("classname", tr.getName());
-                testcaseElement.setAttribute("classname", "load." + new File(this.loadRunnerScenario).getName().replace(".lrs",""));
-				testcaseElement.setAttribute("name", tr.getName());
-				testcaseElement.setAttribute("time", String.valueOf(tr.getAvgRT()));
+                org.w3c.dom.Element testcaseElement = doc.createElement("testcase");
+                //testcaseElement.setAttribute("classname", tr.getName());
+                testcaseElement.setAttribute("classname", "load." + new File(this.loadRunnerScenario).getName().replace(".lrs", ""));
+                testcaseElement.setAttribute("name", tr.getName());
+                testcaseElement.setAttribute("time", String.valueOf(tr.getAvgRT()));
 
-				testsuiteElement.appendChild(testcaseElement);
-			}
+                testsuiteElement.appendChild(testcaseElement);
+            }
 
-			// //////////////////////////////////////////////////////////////////////////
-			// write the content into xml file
-			TransformerFactory transformerFactory = TransformerFactory
-					.newInstance();
-			Transformer transformer = transformerFactory.newTransformer();
-			transformer.setOutputProperty(OutputKeys.INDENT, "yes");
-			transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4");
+            // //////////////////////////////////////////////////////////////////////////
+            // write the content into xml file
+            TransformerFactory transformerFactory = TransformerFactory
+                    .newInstance();
+            Transformer transformer = transformerFactory.newTransformer();
+            transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+            transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4");
 
-			stringReport = this.getStringFromDoc(doc);
+            stringReport = this.getStringFromDoc(doc);
 
-		} catch (ParserConfigurationException pce) {
-			logger.println(pce.getMessage());
-			pce.printStackTrace();
-		} catch (TransformerException tfe) {
-			logger.println(tfe.getMessage());
-			tfe.printStackTrace();
-		}
-		return stringReport;
-	}
+        } catch (ParserConfigurationException pce) {
+            logger.println(pce.getMessage());
+            pce.printStackTrace();
+        } catch (TransformerException tfe) {
+            logger.println(tfe.getMessage());
+            tfe.printStackTrace();
+        }
+        return stringReport;
+    }
 
-	/**
-	 * @param transactions
-	 *            - ArrayList of LoadRunnerTransaction objects
-	 * @return
-	 */
-	private String generatePlotCSVReport(
-			ArrayList<LoadRunnerTransaction> transactions) {
+    /**
+     * @param transactions - ArrayList of LoadRunnerTransaction objects
+     * @return
+     */
+    private String generatePlotCSVReport(
+            ArrayList<LoadRunnerTransaction> transactions) {
 
-		logger.println("Transformation CSV started ...");
+        logger.println("Transformation CSV started ...");
 
-		ArrayList<String> headers = new ArrayList<String>();
-		ArrayList<String> averages = new ArrayList<String>();
+        ArrayList<String> headers = new ArrayList<String>();
+        ArrayList<String> averages = new ArrayList<String>();
 
-		for (LoadRunnerTransaction tr : this.transactions) {
-			headers.add("\"" + tr.getName() + "\"");
-			averages.add(String.valueOf(tr.getAvgRT()));
-		}
+        for (LoadRunnerTransaction tr : this.transactions) {
+            headers.add("\"" + tr.getName() + "\"");
+            averages.add(String.valueOf(tr.getAvgRT()));
+        }
 
-		String scvReport = org.apache.commons.lang3.StringUtils.join(headers,",")
-				+ System.getProperty("line.separator")
-				+ org.apache.commons.lang3.StringUtils.join(averages, ",");
+        String scvReport = org.apache.commons.lang3.StringUtils.join(headers, ",")
+                + System.getProperty("line.separator")
+                + org.apache.commons.lang3.StringUtils.join(averages, ",");
 
-		return scvReport;		
-	}
+        return scvReport;
+    }
 
-	/**
-	 * @param transactions
-	 *            - ArrayList of LoadRunnerTransaction objects
-	 * @param summaryFile
-	 *            - location of SCV summary file to be generated out of
-	 *            transaction objects in PerfPublisher Report format
-	 * @return
-	 */
-	private String generatePerfPublisherReport( ArrayList<LoadRunnerTransaction> transactions) {
-		
-		logger.println("Transformation to XML started ...");
-		String stringReport = "";
-		try {
+    /**
+     * @param transactions - ArrayList of LoadRunnerTransaction objects
+     * //@param summaryFile  - location of SCV summary file to be generated out of
+     *                     transaction objects in PerfPublisher Report format
+     * @return
+     */
+    private String generatePerfPublisherReport(ArrayList<LoadRunnerTransaction> transactions) {
 
-			DocumentBuilderFactory docFactory = DocumentBuilderFactory.newInstance();
-			DocumentBuilder docBuilder = docFactory.newDocumentBuilder();
+        logger.println("Transformation to XML started ...");
+        String stringReport = "";
+        try {
 
-			// root elements
-			org.w3c.dom.Document doc = (org.w3c.dom.Document) docBuilder.newDocument();
-			org.w3c.dom.Element reportElement = (org.w3c.dom.Element) doc.createElement("report");
-			doc.appendChild(reportElement);
+            DocumentBuilderFactory docFactory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder docBuilder = docFactory.newDocumentBuilder();
 
-			// //////////////////////////////////////////////////////////////////////////
+            // root elements
+            org.w3c.dom.Document doc = (org.w3c.dom.Document) docBuilder.newDocument();
+            org.w3c.dom.Element reportElement = (org.w3c.dom.Element) doc.createElement("report");
+            doc.appendChild(reportElement);
 
-			// <categories>
-			// <category name="memory" scale="mb">
-			// <observations>
-			// <observation name="Server 1">100</observation>
-			// <observation name="Server 2">200</observation>
-			// </observations>
-			// </category>
+            // //////////////////////////////////////////////////////////////////////////
 
-			// <category name="disk" scale="gb">
-			// <observations>
-			// <observation name="Server 1">41</observation>
-			// <observation name="Server 2">58</observation>
-			// </observations>
-			// </category>
-			// </categories>
+            // <categories>
+            // <category name="memory" scale="mb">
+            // <observations>
+            // <observation name="Server 1">100</observation>
+            // <observation name="Server 2">200</observation>
+            // </observations>
+            // </category>
 
-			// start element
-			org.w3c.dom.Element startElement = (org.w3c.dom.Element) doc.createElement("start");
-			reportElement.appendChild(startElement);
+            // <category name="disk" scale="gb">
+            // <observations>
+            // <observation name="Server 1">41</observation>
+            // <observation name="Server 2">58</observation>
+            // </observations>
+            // </category>
+            // </categories>
 
-			// date element
-			org.w3c.dom.Element date = (org.w3c.dom.Element) doc.createElement("date");
-			startElement.appendChild(date);
+            // start element
+            org.w3c.dom.Element startElement = (org.w3c.dom.Element) doc.createElement("start");
+            reportElement.appendChild(startElement);
 
-			date.setAttribute("format", "YYYYMMDD");
-			SimpleDateFormat sdf = new SimpleDateFormat("yyyyMdd");
-			date.setAttribute("val", sdf.format(startTime));
+            // date element
+            org.w3c.dom.Element date = (org.w3c.dom.Element) doc.createElement("date");
+            startElement.appendChild(date);
 
-			// time element
-			org.w3c.dom.Element time = (org.w3c.dom.Element) doc.createElement("date");
-			startElement.appendChild(time);
+            date.setAttribute("format", "YYYYMMDD");
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyyMdd");
+            date.setAttribute("val", sdf.format(startTime));
 
-			time.setAttribute("format", "HHMMSS");
-			SimpleDateFormat stf = new SimpleDateFormat("hhmmss");
-			time.setAttribute("val", stf.format(startTime));
+            // time element
+            org.w3c.dom.Element time = (org.w3c.dom.Element) doc.createElement("date");
+            startElement.appendChild(time);
 
-			// //////////////////////////////////////////////////////////////////////////
+            time.setAttribute("format", "HHMMSS");
+            SimpleDateFormat stf = new SimpleDateFormat("hhmmss");
+            time.setAttribute("val", stf.format(startTime));
 
-			// <test name="Smoke test" executed="yes" categ="Smoke test">
+            // //////////////////////////////////////////////////////////////////////////
 
-			// <description>Tests if ATE LAN socket and communication
-			// works.</description>
+            // <test name="Smoke test" executed="yes" categ="Smoke test">
 
-			// <result>
-			// <success passed="yes" state ="100" hasTimedOut="no" />
-			// <compiletime unit="s" mesure="0" isRelevant="yes" />
-			// <performance unit="%" mesure="0" isRelevant="yes" />
-			// <executiontime unit="s" mesure="12" isRelevant="yes" />
-			// <metrics>
-			// <006_My_Benefits unit="sec" mesure="0.115" isRelevant="yes"/>
-			// <007_My_Timesheet unit="sec" mesure="1.247" isRelevant="yes"/>
-			// </metrics>
-			// </result>
-			// </test>
-			// </report>
+            // <description>Tests if ATE LAN socket and communication
+            // works.</description>
 
-			// //////////////////////////////////////////////////////////////////////////
-			// test element
-			org.w3c.dom.Element testElement = doc.createElement("test");
-			reportElement.appendChild(testElement);
+            // <result>
+            // <success passed="yes" state ="100" hasTimedOut="no" />
+            // <compiletime unit="s" mesure="0" isRelevant="yes" />
+            // <performance unit="%" mesure="0" isRelevant="yes" />
+            // <executiontime unit="s" mesure="12" isRelevant="yes" />
+            // <metrics>
+            // <006_My_Benefits unit="sec" mesure="0.115" isRelevant="yes"/>
+            // <007_My_Timesheet unit="sec" mesure="1.247" isRelevant="yes"/>
+            // </metrics>
+            // </result>
+            // </test>
+            // </report>
 
-			testElement.setAttribute("name", "Load test");
-			testElement.setAttribute("executed", "yes");
-			testElement.setAttribute("categ", "Load test");
+            // //////////////////////////////////////////////////////////////////////////
+            // test element
+            org.w3c.dom.Element testElement = doc.createElement("test");
+            reportElement.appendChild(testElement);
 
-			// description element
-			org.w3c.dom.Element descriptionElement = doc.createElement("description");
-			descriptionElement.appendChild(doc.createTextNode("This is the best Load test ever executed..."));
-			reportElement.appendChild(descriptionElement);
+            testElement.setAttribute("name", "Load test");
+            testElement.setAttribute("executed", "yes");
+            testElement.setAttribute("categ", "Load test");
 
-			// //////////////////////////////////////////////////////////////////////////
-			// result
-			org.w3c.dom.Element resultElement = doc.createElement("result");
-			reportElement.appendChild(resultElement);
+            // description element
+            org.w3c.dom.Element descriptionElement = doc.createElement("description");
+            descriptionElement.appendChild(doc.createTextNode("This is the best Load test ever executed..."));
+            reportElement.appendChild(descriptionElement);
 
-			org.w3c.dom.Element successElement = doc.createElement("success");
-			resultElement.appendChild(successElement);
+            // //////////////////////////////////////////////////////////////////////////
+            // result
+            org.w3c.dom.Element resultElement = doc.createElement("result");
+            reportElement.appendChild(resultElement);
 
-			org.w3c.dom.Element compiletimeElement = doc.createElement("compiletime");
-			resultElement.appendChild(compiletimeElement);
+            org.w3c.dom.Element successElement = doc.createElement("success");
+            resultElement.appendChild(successElement);
 
-			org.w3c.dom.Element performanceElement = doc.createElement("performance");
-			resultElement.appendChild(performanceElement);
+            org.w3c.dom.Element compiletimeElement = doc.createElement("compiletime");
+            resultElement.appendChild(compiletimeElement);
 
-			org.w3c.dom.Element executiontimeElement = doc.createElement("executiontime");
-			resultElement.appendChild(executiontimeElement);
+            org.w3c.dom.Element performanceElement = doc.createElement("performance");
+            resultElement.appendChild(performanceElement);
 
-			org.w3c.dom.Element metricsElement = doc.createElement("metrics");
-			resultElement.appendChild(metricsElement);
+            org.w3c.dom.Element executiontimeElement = doc.createElement("executiontime");
+            resultElement.appendChild(executiontimeElement);
 
-			// //////////////////////////////////////////////////////////////////////////
+            org.w3c.dom.Element metricsElement = doc.createElement("metrics");
+            resultElement.appendChild(metricsElement);
 
-			for (LoadRunnerTransaction tr : this.transactions) {
-				// <006_My_Benefits unit="sec" mesure="0.115" isRelevant="yes"/>
-				String trName = "tr_" + tr.getName();
-				logger.println("Dump " + trName);
+            // //////////////////////////////////////////////////////////////////////////
 
-				org.w3c.dom.Element trElement = doc.createElement(trName);
-				trElement.setAttribute("unit", "sec");
-				trElement.setAttribute("mesure", String.valueOf(tr.getAvgRT()));
-				trElement.setAttribute("isRelevant", "yes");
-				metricsElement.appendChild(trElement);
-			}
+            for (LoadRunnerTransaction tr : this.transactions) {
+                // <006_My_Benefits unit="sec" mesure="0.115" isRelevant="yes"/>
+                String trName = "tr_" + tr.getName();
+                logger.println("Dump " + trName);
 
-			// //////////////////////////////////////////////////////////////////////////
-			// write the content into xml file
-			TransformerFactory transformerFactory = TransformerFactory
-					.newInstance();
-			Transformer transformer = transformerFactory.newTransformer();
-			transformer.setOutputProperty(OutputKeys.INDENT, "yes");
-			transformer.setOutputProperty(
-					"{http://xml.apache.org/xslt}indent-amount", "4");
+                org.w3c.dom.Element trElement = doc.createElement(trName);
+                trElement.setAttribute("unit", "sec");
+                trElement.setAttribute("mesure", String.valueOf(tr.getAvgRT()));
+                trElement.setAttribute("isRelevant", "yes");
+                metricsElement.appendChild(trElement);
+            }
 
-			stringReport = this.getStringFromDoc(doc);
+            // //////////////////////////////////////////////////////////////////////////
+            // write the content into xml file
+            TransformerFactory transformerFactory = TransformerFactory
+                    .newInstance();
+            Transformer transformer = transformerFactory.newTransformer();
+            transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+            transformer.setOutputProperty(
+                    "{http://xml.apache.org/xslt}indent-amount", "4");
 
-		} catch (ParserConfigurationException pce) {
-			logger.println(pce.getMessage());
-			pce.printStackTrace();
-		} catch (TransformerException tfe) {
-			logger.println(tfe.getMessage());
-			tfe.printStackTrace();
-		}
-		return stringReport;
-	}
+            stringReport = this.getStringFromDoc(doc);
 
-	private String getStringFromDoc(org.w3c.dom.Document doc) {
-		try {
-			DOMSource domSource = new DOMSource(doc);
-			StringWriter writer = new StringWriter();
-			StreamResult result = new StreamResult(writer);
-			TransformerFactory tf = TransformerFactory.newInstance();
-			Transformer transformer = tf.newTransformer();
-			transformer.transform(domSource, result);
-			writer.flush();
-			return writer.toString();
-		} catch (TransformerException ex) {
-			ex.printStackTrace();
-			return null;
-		}
-	}
+        } catch (ParserConfigurationException pce) {
+            logger.println(pce.getMessage());
+            pce.printStackTrace();
+        } catch (TransformerException tfe) {
+            logger.println(tfe.getMessage());
+            tfe.printStackTrace();
+        }
+        return stringReport;
+    }
+
+    private String getStringFromDoc(org.w3c.dom.Document doc) {
+        try {
+            DOMSource domSource = new DOMSource(doc);
+            StringWriter writer = new StringWriter();
+            StreamResult result = new StreamResult(writer);
+            TransformerFactory tf = TransformerFactory.newInstance();
+            Transformer transformer = tf.newTransformer();
+            transformer.transform(domSource, result);
+            writer.flush();
+            return writer.toString();
+        } catch (TransformerException ex) {
+            ex.printStackTrace();
+            return null;
+        }
+    }
+
+    private class Pair {
+        private String value;
+        private Boolean flag;
+
+        public Pair(String value, Boolean flag) {
+            this.value = value;
+            this.flag = flag;
+        }
+
+        public String getValue() {
+            return this.value;
+        }
+
+        public void setValue(String value) {
+            this.value = value;
+        }
+
+        public boolean getFlag() {
+            return flag.booleanValue();
+        }
+
+        public void setFlag(boolean value) {
+            this.flag = Boolean.valueOf(value);
+        }
+    }
 }
+
+
+
