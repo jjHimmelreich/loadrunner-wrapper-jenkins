@@ -18,7 +18,8 @@ package perflab.loadrunnerwrapperjenkins;
 
 import java.io.*;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
 
 import org.jfree.util.Log;
 import org.jsoup.Jsoup;
@@ -29,6 +30,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.filefilter.WildcardFileFilter;
 
 import java.io.File;
+import java.util.HashMap;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -50,23 +52,38 @@ public class LoadRunnerWrapper {
 	private String loadRunnerControllerAdditionalAttributes;
 	private String loadRunnerResultsSummaryFileFormat;
 	private ArrayList<LoadRunnerTransaction> transactions = new ArrayList<LoadRunnerTransaction>();
+    private ArrayList<LoadRunnerWrapperJenkins.LoadRunnerTransactionBoundary> reportTargetsValuesPerTransaction;
 	private Date startTime;
 	private PrintStream logger;
     private HashMap<String, Pair> LRSFlags;
     private HashMap<String, Pair> AnalysisTemplatesFlags;
 
+    private enum TRANSACTION_STATUS {SUCCESS, ERROR, FAILURE}
 
-	/**
-	 * @param printStream
-	 * @parameter default-value="${basedir}"
-	 */
+    /**
+     * Constructor for LoadRunnerWrapper
+     * @param logger
+     * @param loadRunnerBin
+     * @param loadRunnerScenario
+     * @param loadRunnerControllerAdditionalAttributes
+     * @param loadRunnerResultsFolder
+     * @param loadRunnerAnalysisTemplateName
+     * @param loadRunnerAnalysisHTMLReportFolder
+     * @param loadRunnerResultsSummaryFile
+     * @param loadRunnerResultsSummaryFileFormat
+     * @param reportTargetsValuesPerTransaction
+     */
 	public LoadRunnerWrapper(String loadRunnerBin, String loadRunnerScenario,
-        String loadRunnerControllerAdditionalAttributes,
-        String loadRunnerResultsFolder,
-        String loadRunnerAnalysisTemplateName,
-        String loadRunnerAnalysisHTMLReportFolder,
-        String loadRunnerResultsSummaryFile,
-        String loadRunnerResultsSummaryFileFormat, PrintStream logger) {
+                             String loadRunnerControllerAdditionalAttributes,
+                             String loadRunnerResultsFolder,
+                             String loadRunnerAnalysisTemplateName,
+                             String loadRunnerAnalysisHTMLReportFolder,
+                             String loadRunnerResultsSummaryFile,
+                             String loadRunnerResultsSummaryFileFormat,
+                             ArrayList<LoadRunnerWrapperJenkins.LoadRunnerTransactionBoundary> reportTargetsValuesPerTransaction,
+                             PrintStream logger)
+	{
+
 		this.loadRunnerBin = loadRunnerBin;
 		this.loadRunnerScenario = loadRunnerScenario;
 		this.loadRunnerResultsFolder = loadRunnerResultsFolder;
@@ -75,6 +92,7 @@ public class LoadRunnerWrapper {
 		this.loadRunnerControllerAdditionalAttributes = loadRunnerControllerAdditionalAttributes;
 		this.loadRunnerAnalysisTemplateName = loadRunnerAnalysisTemplateName;
 		this.loadRunnerResultsSummaryFileFormat = loadRunnerResultsSummaryFileFormat;
+        this.reportTargetsValuesPerTransaction = reportTargetsValuesPerTransaction;
 		this.logger = logger;
         LRSFlags = new HashMap<String, Pair>();
         AnalysisTemplatesFlags = new HashMap<String, Pair>();
@@ -90,6 +108,11 @@ public class LoadRunnerWrapper {
         AnalysisTemplatesFlags.put("AutoClose", new Pair("1", false));
     }
 
+    /**
+     * Execute sequence of Controller and Analysis
+     *
+     * @return
+     */
 	public boolean execute() {
 
 		boolean okay = true;
@@ -102,8 +125,8 @@ public class LoadRunnerWrapper {
 		//Check if lrs exists
 		boolean lrsExists = checkIfScenarioExists();
         if(!lrsExists) {
-            logger.println("[ERROR] Scenario file " + this.loadRunnerScenario + " was not found on slave. Aborting job");
-            System.out.println("[ERROR] Scenario file " + this.loadRunnerScenario + " was not found on slave. Aborting job");
+            Log.error("Scenario file " + this.loadRunnerScenario + " was not found on slave. Aborting job");
+
             okay = false;
             return okay;
         }
@@ -116,8 +139,7 @@ public class LoadRunnerWrapper {
 		//Check if Analysis template exists
 		boolean analysisTemplateExists = checkIfTemplateExists();
         if(!analysisTemplateExists) {
-            logger.println("[ERROR] Analysis Template " + this.loadRunnerScenario + " was not found on slave. Aborting job");
-            System.out.println("[ERROR] Analysis Template " + this.loadRunnerScenario + " was not found on slave. Aborting job");
+            Log.error("[ERROR] Scenario file " + this.loadRunnerScenario + " was not found on slave. Aborting job");
             okay = false;
             return okay;
         }
@@ -146,8 +168,7 @@ public class LoadRunnerWrapper {
 
 		if (controllerRC != -1) {
 			/* Run Analysis if controller return code is okay */
-			// "c:\Program Files\Mercury\LoadRunner\bin\AnalysisUI.exe" -RESULTPATH C:\Temp\30users\30users.lrr -TEMPLATENAME
-			// WinResTemplate
+			// "c:\Program Files\Mercury\LoadRunner\bin\AnalysisUI.exe" -RESULTPATH C:\Temp\30users\30users.lrr -TEMPLATENAME WinResTemplate
 			String resultsFile = getResultsFile(loadRunnerResultsFolder);
 
             if(resultsFile.isEmpty()){
@@ -174,13 +195,16 @@ public class LoadRunnerWrapper {
 			}
 			okay = true;
 		} else {
-			logger.println("Controller failed. Exit code is: " + controllerRC);
-			System.out.println("Controller failed. Exit code is: " + controllerRC);
+            Log.error("Controller failed. Exit code is: " + controllerRC);
 			okay = false;
 		}
 		return okay;
 	}
 
+    /**
+     * check if this.loadRunnerAnalysisTemplateName exists on filesystem
+     * @return - true if template file exists
+     */
     private boolean checkIfTemplateExists() {
         boolean okay = false;
 
@@ -192,6 +216,10 @@ public class LoadRunnerWrapper {
     }
 
 
+    /**
+     * check if loadrunner scenario exists
+     * @return - true if LRS file exists
+     */
     private boolean checkIfScenarioExists() {
 		boolean okay = false;
 
@@ -231,11 +259,11 @@ public class LoadRunnerWrapper {
         return okay;
     }
 
-        /**
-         * @param resultsFolder
-         * @return name of lrr file name in results folder
-         */
-
+    /**
+     * Looing for .lrr file ion results folder
+     * @param resultsFolder
+     * @return name of lrr file name in results folder
+     */
     private String getResultsFile(String resultsFolder) {
 
         logger.println("Looking for lrr file in " + resultsFolder);
@@ -279,7 +307,8 @@ public class LoadRunnerWrapper {
      */
     private int runCommand(String command) {
         int exitCode = -1;
-        logger.println("Command to run: " + command);
+
+        Log.info("Command to run: " + command);
 
         try {
             Process p = Runtime.getRuntime().exec(command);
@@ -305,23 +334,20 @@ public class LoadRunnerWrapper {
 
         parseSummaryFile(htmlReportFolder + "\\summary.html", loadRunnerResultsSummaryFile);
 
-        if (this.loadRunnerResultsSummaryFileFormat.equals("PerfPublisherReport")) {
-            summaryString = generatePerfPublisherReport(this.transactions);
-        } else if (this.loadRunnerResultsSummaryFileFormat.equals("PlotCSVReport")) {
-            summaryString = generatePlotCSVReport(this.transactions);
-        } else if (this.loadRunnerResultsSummaryFileFormat.equals("jUnitReport")) {
-            summaryString = generatejUnitReport(this.transactions);
-        }
+        if (this.loadRunnerResultsSummaryFileFormat.equals("PerfPublisherReport")) { summaryString = generatePerfPublisherReport(this.transactions); }
+        else if (this.loadRunnerResultsSummaryFileFormat.equals("PlotCSVReport"))  { summaryString = generatePlotCSVReport(this.transactions); }
+        else if (this.loadRunnerResultsSummaryFileFormat.equals("jUnitReport"))    { summaryString = generatejUnitReport(this.transactions, this.reportTargetsValuesPerTransaction); }
 
         try {
-            FileUtils.writeStringToFile(new File(loadRunnerResultsSummaryFile),
-                    summaryString);
-            logger.println(summaryString);
+
+            FileUtils.writeStringToFile(new File(loadRunnerResultsSummaryFile), summaryString);
+            //logger.println(summaryString);
             logger.println("Report is saved to " + loadRunnerResultsSummaryFile);
+
         } catch (IOException e) {
+
             e.printStackTrace();
-            logger.println("Can't write custom csv report for plotting "
-                    + e.getMessage());
+            logger.println("Can't write custom csv report for plotting " + e.getMessage());
         }
     }
 
@@ -363,28 +389,36 @@ public class LoadRunnerWrapper {
             }
 
         } catch (IOException e) {
-            logger.println("Can't read LoadRunner Analysis html report " + e.getMessage());
+            Log.error("Can't read LoadRunner Analysis html report " + e.getMessage());
         }
 
     }
 
     /**
-     * @param transactions - ArrayList of LoadRunnerTransaction objects
      * @return
+     * @param transactions
+     * @param reportTargetsValuesPerTransaction
      */
-    private String generatejUnitReport(
-            ArrayList<LoadRunnerTransaction> transactions) {
+    private String generatejUnitReport(ArrayList<LoadRunnerTransaction> transactions,
+                                       ArrayList<LoadRunnerWrapperJenkins.LoadRunnerTransactionBoundary> reportTargetsValuesPerTransaction) {
+        Log.info("Transformation to jUnit XML started ...");
+
         String stringReport = "";
-        logger.println("Transformation to jUnit XML started ...");
+
+
+        for(LoadRunnerWrapperJenkins.LoadRunnerTransactionBoundary kpi : reportTargetsValuesPerTransaction){
+            System.out.println("=====" + kpi.toString());
+        }
+
         try {
 			/*
 			 * http://llg.cubic.org/docs/junit/
-			 *<testsuite tests="3" time="42.5"> 
+			 *<testsuite tests="3" time="42.5">
 			 * 	<testcase classname="ZZZ_1" name="ZZZ_1" time="10.1"/>
 			 *  <testcase classname="ZZZ_2" name="ZZZ_2" time="11.7"/>
 			 *  <testcase classname="ZZZ_3" name="ZZZ_3" time="12.2">
 			 *  <!--failure type="NotEnoughFoo"> too slow </failure-->
-			 *  </testcase> 
+			 *  </testcase>
 			 *</testsuite>
 			 */
 
@@ -395,28 +429,44 @@ public class LoadRunnerWrapper {
             org.w3c.dom.Document doc = (org.w3c.dom.Document) docBuilder.newDocument();
             org.w3c.dom.Element testsuiteElement = (org.w3c.dom.Element) doc.createElement("testsuite");
             testsuiteElement.setAttribute("tests", String.valueOf(transactions.size()));
+
+            //TODO: add total tests duration form HTML report
             // testsuiteElement.setAttribute("time", "total test duration");
             doc.appendChild(testsuiteElement);
 
             // //////////////////////////////////////////////////////////////////////////
 
-            for (LoadRunnerTransaction tr : this.transactions) {
+            for (LoadRunnerTransaction tr : transactions) {
 
-                logger.println("Dump " + tr.getName());
+                String trName = tr.getName();
+                float trValue = tr.getAvgRT();
+
+                Log.info("Dump " + trName );
 
                 org.w3c.dom.Element testcaseElement = doc.createElement("testcase");
                 //testcaseElement.setAttribute("classname", tr.getName());
-                testcaseElement.setAttribute("classname", "load." + new File(this.loadRunnerScenario).getName().replace(".lrs", ""));
-                testcaseElement.setAttribute("name", tr.getName());
-                testcaseElement.setAttribute("time", String.valueOf(tr.getAvgRT()));
+                testcaseElement.setAttribute("classname", "load." + new File(loadRunnerScenario).getName().replace(".lrs", ""));
+                testcaseElement.setAttribute("name", trName);
+                testcaseElement.setAttribute("time", String.valueOf(trValue));
+
+                //TODO: evaluate values for transaction and add failure if needed
+                TRANSACTION_STATUS trStatus = calculateTransactionStatus(trName, trValue, reportTargetsValuesPerTransaction);
+                switch(trStatus){
+                    case ERROR:
+                    case FAILURE:
+                        org.w3c.dom.Element failureElement = doc.createElement("failure");
+                        failureElement.setAttribute("message","high response time");
+                        failureElement.setTextContent("Average transaction response time is above limit");
+                        testcaseElement.appendChild(failureElement);
+                        break;
+                }
 
                 testsuiteElement.appendChild(testcaseElement);
             }
 
             // //////////////////////////////////////////////////////////////////////////
             // write the content into xml file
-            TransformerFactory transformerFactory = TransformerFactory
-                    .newInstance();
+            TransformerFactory transformerFactory = TransformerFactory.newInstance();
             Transformer transformer = transformerFactory.newTransformer();
             transformer.setOutputProperty(OutputKeys.INDENT, "yes");
             transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4");
@@ -424,18 +474,55 @@ public class LoadRunnerWrapper {
             stringReport = this.getStringFromDoc(doc);
 
         } catch (ParserConfigurationException pce) {
-            logger.println(pce.getMessage());
+            Log.error(pce.getMessage());
             pce.printStackTrace();
         } catch (TransformerException tfe) {
-            logger.println(tfe.getMessage());
+            Log.error(tfe.getMessage());
             tfe.printStackTrace();
         }
         return stringReport;
     }
 
+    private TRANSACTION_STATUS calculateTransactionStatus(String trName, float trValue,
+                                                          ArrayList<LoadRunnerWrapperJenkins.LoadRunnerTransactionBoundary> reportTargetsValuesPerTransaction) {
+
+        TRANSACTION_STATUS status = TRANSACTION_STATUS.SUCCESS;
+
+
+        for( LoadRunnerWrapperJenkins.LoadRunnerTransactionBoundary target : reportTargetsValuesPerTransaction ){
+            if(trName.equals(target.getTransactionName())){
+
+
+                if(target.isDoNotCompare() != true){
+
+                    logger.println("Checking: " + trName +
+                            " Warning after:" + target.getTransactionWarningValue() +
+                            " Error after:" + target.getTransactionErrorValue() );
+
+                    //Bigger then Error
+                    if ( trValue >= target.getTransactionErrorValue()) {
+                        status = TRANSACTION_STATUS.FAILURE;
+
+                    //Between Warning and Error
+                    }else if ( trValue > target.getTransactionWarningValue() && trValue < target.getTransactionErrorValue()) {
+                        status = TRANSACTION_STATUS.SUCCESS;
+                    }
+
+                }else{
+                    logger.println("Skipping evaluation of : " + trName );
+
+                    status = TRANSACTION_STATUS.SUCCESS;
+                }
+                break;
+            }
+        }
+
+        return status;
+    }
+
     /**
      * @param transactions - ArrayList of LoadRunnerTransaction objects
-     * @return
+     * @return - string with CSV formatted report
      */
     private String generatePlotCSVReport(
             ArrayList<LoadRunnerTransaction> transactions) {
@@ -459,9 +546,7 @@ public class LoadRunnerWrapper {
 
     /**
      * @param transactions - ArrayList of LoadRunnerTransaction objects
-     * //@param summaryFile  - location of SCV summary file to be generated out of
-     *                     transaction objects in PerfPublisher Report format
-     * @return
+     * @return - string in PerfPublisherReport format
      */
     private String generatePerfPublisherReport(ArrayList<LoadRunnerTransaction> transactions) {
 
@@ -574,7 +659,7 @@ public class LoadRunnerWrapper {
             for (LoadRunnerTransaction tr : this.transactions) {
                 // <006_My_Benefits unit="sec" mesure="0.115" isRelevant="yes"/>
                 String trName = "tr_" + tr.getName();
-                logger.println("Dump " + trName);
+                Log.info("Dump " + trName);
 
                 org.w3c.dom.Element trElement = doc.createElement(trName);
                 trElement.setAttribute("unit", "sec");
@@ -595,15 +680,20 @@ public class LoadRunnerWrapper {
             stringReport = this.getStringFromDoc(doc);
 
         } catch (ParserConfigurationException pce) {
-            logger.println(pce.getMessage());
+            Log.error(pce.getMessage());
             pce.printStackTrace();
         } catch (TransformerException tfe) {
-            logger.println(tfe.getMessage());
+            Log.error(tfe.getMessage());
             tfe.printStackTrace();
         }
         return stringReport;
     }
 
+    /**
+     * Convert org.w3c.dom.Document to String
+     * @param doc
+     * @return
+     */
     private String getStringFromDoc(org.w3c.dom.Document doc) {
         try {
             DOMSource domSource = new DOMSource(doc);

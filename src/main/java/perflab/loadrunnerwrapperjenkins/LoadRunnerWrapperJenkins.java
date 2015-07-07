@@ -1,11 +1,10 @@
 package perflab.loadrunnerwrapperjenkins;
 
+import com.google.common.collect.Lists;
 import hudson.Extension;
 import hudson.FilePath;
 import hudson.Launcher;
-import hudson.model.AbstractBuild;
-import hudson.model.AbstractProject;
-import hudson.model.BuildListener;
+import hudson.model.*;
 import hudson.remoting.Callable;
 import hudson.remoting.RemoteOutputStream;
 import hudson.tasks.BuildStepDescriptor;
@@ -21,25 +20,18 @@ import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 
 import java.io.IOException;
+import java.util.ArrayList;
 
 import javax.servlet.ServletException;
 
 /**
- * Sample {@link Builder}.
- *
  * <p>
- * When the user configures the project and enables this builder,
- * {@link DescriptorImpl#newInstance(StaplerRequest)} is invoked
- * and a new {@link LoadRunnerWrapperJenkins} is created. The created
- * instance is persisted to the project configuration XML by using
- * XStream, so this allows you to use instance fields (like {@link #name})
- * to remember the configuration.
+ * When a build is performed, LoadRunner Controller and Analysis are being executed on slave machine.
+ * When test is finished, averages from Analysis report are reported in jUnit XML report format.
+ * Transactions with high response time (above defined limit) are reported as failed.
+ * Transactions with high errors rate (above defined limit) are reported as failed. (Not implemented yet)
  *
- * <p>
- * When a build is performed, the {@link #perform(AbstractBuild, Launcher, BuildListener)}
- * method will be invoked. 
- *
- * @author Kohsuke Kawaguchi
+ * @author Evgeny Himmelreich
  */
 public class LoadRunnerWrapperJenkins extends Builder {
 
@@ -50,12 +42,24 @@ public class LoadRunnerWrapperJenkins extends Builder {
     private String loadRunnerAnalysisHTMLReportFolder;
     private final String loadRunnerControllerAdditionalAttributes;
     private final String loadRunnerAnalysisTemplateName;
-    
     private String loadRunnerResultsSummaryFile;
     private final String loadRunnerResultsSummaryFileFormat;
+    private final ArrayList<LoadRunnerTransactionBoundary> reportTargetsValuesPerTransaction;
 
 
     // Fields in config.jelly must match the parameter names in the "DataBoundConstructor"
+    /**
+     *
+     * @param loadRunnerBin
+     * @param loadRunnerScenario
+     * @param loadRunnerResultsFolder
+     * @param loadRunnerAnalysisTemplateName
+     * @param loadRunnerAnalysisHTMLReportFolder
+     * @param loadRunnerResultsSummaryFile
+     * @param loadRunnerControllerAdditionalAttributes
+     * @param loadRunnerResultsSummaryFileFormat
+     * @param reportTargetsValuesPerTransaction
+     */
     @DataBoundConstructor
     public LoadRunnerWrapperJenkins(//String name,
                              String loadRunnerBin,
@@ -65,7 +69,8 @@ public class LoadRunnerWrapperJenkins extends Builder {
                              String loadRunnerAnalysisHTMLReportFolder,
                              String loadRunnerResultsSummaryFile,
                              String loadRunnerControllerAdditionalAttributes,
-                             String loadRunnerResultsSummaryFileFormat) {
+                             String loadRunnerResultsSummaryFileFormat,
+                             ArrayList<LoadRunnerTransactionBoundary> reportTargetsValuesPerTransaction) {
 
         //this.name = name;
         this.loadRunnerBin = loadRunnerBin;
@@ -76,6 +81,11 @@ public class LoadRunnerWrapperJenkins extends Builder {
         this.loadRunnerControllerAdditionalAttributes = loadRunnerControllerAdditionalAttributes;
         this.loadRunnerAnalysisTemplateName = loadRunnerAnalysisTemplateName;
         this.loadRunnerResultsSummaryFileFormat = loadRunnerResultsSummaryFileFormat;
+
+        this.reportTargetsValuesPerTransaction = Lists.newArrayList();
+        if(reportTargetsValuesPerTransaction != null) {
+            this.reportTargetsValuesPerTransaction.addAll(reportTargetsValuesPerTransaction);
+        }
     }
 
     /**
@@ -84,34 +94,24 @@ public class LoadRunnerWrapperJenkins extends Builder {
     public String getLoadRunnerBin(){
         return this.loadRunnerBin;
     }
-
     public String getLoadRunnerScenario() {
         return this.loadRunnerScenario;
     }
-
     public String getLoadRunnerResultsFolder(){
         return this.loadRunnerResultsFolder;
     }
-
     public String getLoadRunnerAnalysisHTMLReportFolder(){
         return this.loadRunnerAnalysisHTMLReportFolder;
     }
-
     public String getLoadRunnerResultsSummaryFile(){
         return this.loadRunnerResultsSummaryFile;
     }
-    
-    public String getLoadRunnerControllerAdditionalAttributes(){
-    	return this.loadRunnerControllerAdditionalAttributes;
-    }
-    
-    public String getLoadRunnerAnalysisTemplateName(){
-    	return this.loadRunnerAnalysisTemplateName;
-    }
-    
+    public String getLoadRunnerControllerAdditionalAttributes(){ return this.loadRunnerControllerAdditionalAttributes; }
+    public String getLoadRunnerAnalysisTemplateName(){ return this.loadRunnerAnalysisTemplateName; }
     public String getLoadRunnerResultsSummaryFileFormat(){
     	return this.loadRunnerResultsSummaryFileFormat;
     }
+    public ArrayList<LoadRunnerTransactionBoundary> getReportTargetsValuesPerTransaction() { return this.reportTargetsValuesPerTransaction;}
 
     //TODO: https://wiki.jenkins-ci.org/display/JENKINS/Making+your+plugin+behave+in+distributed+Jenkins
     //TODO: http://ccoetech.ebay.com/tutorial-dev-jenkins-plugin-distributed-jenkins    
@@ -125,8 +125,9 @@ public class LoadRunnerWrapperJenkins extends Builder {
 		private String loadRunnerControllerAdditionalAttributes;
 		private String loadRunnerAnalysisTemplateName;
 		private String loadRunnerResultsSummaryFileFormat;
-		
-    	public LauncherCallable(BuildListener listener){
+        private ArrayList<LoadRunnerTransactionBoundary> reportTargetsValuesPerTransaction;
+
+        public LauncherCallable(BuildListener listener){
     		this.listener = listener;    		
     	}
     	
@@ -136,12 +137,17 @@ public class LoadRunnerWrapperJenkins extends Builder {
         	final RemoteOutputStream ros = new RemoteOutputStream(listener.getLogger());
             // This code will run on the build slave
         	//Write on node console
-            System.out.println("loadRunnerBin = " + loadRunnerBin);
+            /*System.out.println("loadRunnerBin = " + loadRunnerBin);
             System.out.println("loadRunnerScenario = " + this.loadRunnerScenario);
             System.out.println("loadRunnerResultsFolder = " + this.loadRunnerResultsFolder);
             System.out.println("loadRunnerAnalysisHTMLReportFolder = " + this.loadRunnerAnalysisHTMLReportFolder);           
             System.out.println("loadRunnerResultsSummaryFile = " + loadRunnerResultsSummaryFile);
             System.out.println("loadRunnerResultsSummaryFileFormat = " + loadRunnerResultsSummaryFileFormat);
+
+            System.out.println("=================== KPIs ==================");
+            for(LoadRunnerTransactionBoundary kpi : reportTargetsValuesPerTransaction){
+                System.out.println("=====" + kpi.toString());
+            }*/
 
         	//Write on jenkins console
             ros.write("=============================================================\n".getBytes());
@@ -153,7 +159,16 @@ public class LoadRunnerWrapperJenkins extends Builder {
             ros.write(("loadRunnerResultsSummaryFile = " + loadRunnerResultsSummaryFile+ "\n").getBytes());
             ros.write(("loadRunnerResultsSummaryFileFormat = " + loadRunnerResultsSummaryFileFormat+ "\n").getBytes());
 
-            LoadRunnerWrapper loadRunner = new LoadRunnerWrapper(this.loadRunnerBin, 
+            ros.write("=================== KPIs ==================\n".getBytes());
+            for(LoadRunnerTransactionBoundary kpi : reportTargetsValuesPerTransaction){
+                ros.write(("=====" + kpi.toString() + "\n").getBytes());
+            }
+
+            //////// DEBUG ////////
+            // if(1==1){return String.valueOf(true);}
+
+            LoadRunnerWrapper loadRunner = new LoadRunnerWrapper(
+                    this.loadRunnerBin,
             		this.loadRunnerScenario, 
             		this.loadRunnerControllerAdditionalAttributes,
             		this.loadRunnerResultsFolder, 
@@ -161,10 +176,10 @@ public class LoadRunnerWrapperJenkins extends Builder {
             		this.loadRunnerAnalysisHTMLReportFolder, 
             		this.loadRunnerResultsSummaryFile,
             		this.loadRunnerResultsSummaryFileFormat,
+                    reportTargetsValuesPerTransaction,
             		this.listener.getLogger());
  
             boolean okay = loadRunner.execute();
-            //boolean okay = true;
             
             return String.valueOf(okay);
          }
@@ -176,12 +191,10 @@ public class LoadRunnerWrapperJenkins extends Builder {
 		}
 
 		public void init(String loadRunnerBin, String loadRunnerScenario,
-				String loadRunnerControllerAdditionalAttributes,
-				String loadRunnerResultsFolder,
-				String loadRunnerAnalysisTemplateName,
-				String loadRunnerAnalysisHTMLReportFolder,
-				String loadRunnerResultsSummaryFile,
-				String loadRunnerResultsSummaryFileFormat) {
+				String loadRunnerControllerAdditionalAttributes, String loadRunnerResultsFolder,
+				String loadRunnerAnalysisTemplateName, String loadRunnerAnalysisHTMLReportFolder,
+				String loadRunnerResultsSummaryFile, String loadRunnerResultsSummaryFileFormat,
+                ArrayList<LoadRunnerTransactionBoundary> reportTargetsValuesPerTransaction) {
 						
 			this.loadRunnerBin = loadRunnerBin;
 	        this.loadRunnerScenario = loadRunnerScenario;
@@ -191,7 +204,8 @@ public class LoadRunnerWrapperJenkins extends Builder {
 	        this.loadRunnerControllerAdditionalAttributes = loadRunnerControllerAdditionalAttributes;
 	        this.loadRunnerAnalysisTemplateName = loadRunnerAnalysisTemplateName;	
 	        this.loadRunnerResultsSummaryFileFormat = loadRunnerResultsSummaryFileFormat;
-		}
+            this.reportTargetsValuesPerTransaction = reportTargetsValuesPerTransaction;
+        }
      }
     
     
@@ -200,8 +214,10 @@ public class LoadRunnerWrapperJenkins extends Builder {
         // This is where you 'build' the project.
         // Since this is a dummy, we just say 'hello world' and call that a build.
         boolean okay = true;
-    	
-    	// Get a "channel" to the build machine and run the task there
+
+
+
+        // Get a "channel" to the loadrunner machine and run the task there
 
     	try {
     		LauncherCallable remoteLauncher = new LauncherCallable(listener);
@@ -215,8 +231,8 @@ public class LoadRunnerWrapperJenkins extends Builder {
     		}    		    		
 
     		String buildNumber =  String.valueOf(build.getNumber());
-    		String workspacePath = StringEscapeUtils.escapeJava(build.getWorkspace().toString()); 
-    		
+    		String workspacePath = StringEscapeUtils.escapeJava(build.getWorkspace().toString());
+
     		loadRunnerResultsFolder = interpolatePath(loadRunnerResultsFolder, "BUILD_NUMBER", buildNumber);
     		loadRunnerAnalysisHTMLReportFolder = interpolatePath(loadRunnerAnalysisHTMLReportFolder, "BUILD_NUMBER", buildNumber);
     		loadRunnerResultsSummaryFile = interpolatePath(loadRunnerResultsSummaryFile, "BUILD_NUMBER", buildNumber);
@@ -232,7 +248,8 @@ public class LoadRunnerWrapperJenkins extends Builder {
 					loadRunnerAnalysisTemplateName,
 					loadRunnerAnalysisHTMLReportFolder, 
 					loadRunnerResultsSummaryFile,
-					loadRunnerResultsSummaryFileFormat);
+					loadRunnerResultsSummaryFileFormat,
+                    reportTargetsValuesPerTransaction);
     		
     		String okayString = launcher.getChannel().call(remoteLauncher);    		
 
@@ -298,6 +315,18 @@ public class LoadRunnerWrapperJenkins extends Builder {
             load();
         }
 
+        public boolean isApplicable(Class<? extends AbstractProject> aClass) {
+            // Indicates that this builder can be used with all kinds of project types
+            return true;
+        }
+
+        /**
+         * This human readable name is used in the configuration screen.
+         */
+        public String getDisplayName() {
+            return "perflab:HP LoadRunner Wrapper";
+        }
+
         /**
          * Performs on-the-fly validation of the form fields.
          */
@@ -313,7 +342,7 @@ public class LoadRunnerWrapperJenkins extends Builder {
                 return FormValidation.error("LoadRunner scenario path should not be empty. For example: C:\\scenario\\Scenario1.lrs");
             }
             
-            String fileExtension=null;
+            String fileExtension = null;
             try {
                 fileExtension=value.substring(value.lastIndexOf('.') + 1);
             }catch (Exception e) {
@@ -365,17 +394,57 @@ public class LoadRunnerWrapperJenkins extends Builder {
             }
             return FormValidation.ok();
         }
-        
-        public boolean isApplicable(Class<? extends AbstractProject> aClass) {
-            // Indicates that this builder can be used with all kinds of project types 
-            return true;
+    }
+
+    // Fields in config.jelly must match the parameter names in the "DataBoundConstructor"
+    public static class LoadRunnerTransactionBoundary extends AbstractDescribableImpl<LoadRunnerTransactionBoundary> {
+        private final String transactionName;
+        private final int transactionWarningValue;
+        private final int transactionErrorValue;
+        private final boolean doNotCompare;
+
+        @DataBoundConstructor
+        public LoadRunnerTransactionBoundary(final String transactionName, final int transactionWarningValue, final int transactionErrorValue, final boolean doNotCompare) {
+            super();
+            this.transactionName = transactionName;
+            this.transactionWarningValue = transactionWarningValue;
+            this.transactionErrorValue = transactionErrorValue;
+            this.doNotCompare = doNotCompare;
         }
 
-        /**
-         * This human readable name is used in the configuration screen.
-         */
-        public String getDisplayName() {
-            return "HP LoadRunner Wrapper by Perflab";
+        public boolean isDoNotCompare() {
+            return doNotCompare;
+        }
+
+        public int getTransactionErrorValue() {
+            return transactionErrorValue;
+        }
+
+        public int getTransactionWarningValue() {
+            return transactionWarningValue;
+        }
+
+        public String getTransactionName() {
+            return transactionName;
+        }
+
+        public String toString(){
+            return  " transactionName=" + transactionName +
+                    " transactionWarningValue="+transactionWarningValue +
+                    " transactionErrorValue=" + transactionErrorValue +
+                    " doNotCompare=" + doNotCompare;
+        }
+
+        @Extension
+        public static class DescriptorImpl extends Descriptor<LoadRunnerTransactionBoundary> {
+
+            public DescriptorImpl() {
+                load();
+            }
+
+            public String getDisplayName() {
+                return StringUtils.EMPTY;
+            }
         }
     }
 }

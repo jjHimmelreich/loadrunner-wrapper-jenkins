@@ -1,5 +1,5 @@
 <?jelly escape-by-default='true'?>
-<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form">
+<j:jelly xmlns:j="jelly:core" xmlns:f="/lib/form" xmlns:st="jelly:stapler">
   <!--
     This jelly script is used for per-project configuration.
 
@@ -34,7 +34,7 @@
     <f:textbox default="%WORKSPACE%\\%BUILD_NUMBER%\\An_Report1"/>
   </f:entry>
 
-  <f:entry name="loadRunnerResultsSummaryFileFormat" title="LoadRunner Wrapper Summary Format" field="loadRunnerResultsSummaryFileFormat">
+  <f:entry title="LoadRunner Wrapper Summary Format" field="loadRunnerResultsSummaryFileFormat">
   	<select name="loadRunnerResultsSummaryFileFormat">
         <option value="PerfPublisherReport"        >PerfPublisher Report</option>
         <option value="PlotCSVReport"              >PlotCSV Report</option>
@@ -42,4 +42,49 @@
     </select>
   </f:entry>
 
+  <f:entry>
+
+    <table width="100%">
+      <col width="25%"/>
+      <col width="25%"/>
+      <col width="25%"/>
+      <col width="25%"/>
+      <tr>
+        <td>Transaction Name</td>
+        <td>Warning Level [sec]</td>
+        <td>Error Level [sec]</td>
+        <td>Skip it</td>
+      </tr>
+    </table>
+
+    <f:repeatable field="reportTargetsValuesPerTransaction" name="reportTargetsValuesPerTransaction">
+      <table width="100%">
+        <col width="25%"/>
+        <col width="25%"/>
+        <col width="25%"/>
+        <col width="25%"/>
+        <tr>
+          <td>
+            <f:textbox field="transactionName" name="transactionName" default=""/>
+          </td>
+
+          <td>
+            <f:number field="transactionWarningValue" name="transactionWarningValue" default="0.200"/>
+          </td>
+
+          <td>
+            <f:number field="transactionErrorValue" name="transactionErrorValue" default="0.300" />
+          </td>
+
+          <td align="center">
+            <f:checkbox field="doNotCompare" name="doNotCompare"/>
+          </td>
+
+          <td>
+            <f:repeatableDeleteButton/>
+          </td>
+        </tr>
+      </table>
+    </f:repeatable>
+  </f:entry>
 </j:jelly>
