@@ -61,12 +61,12 @@ public class LoadRunnerWrapper {
 	 * @parameter default-value="${basedir}"
 	 */
 	public LoadRunnerWrapper(String loadRunnerBin, String loadRunnerScenario,
-             String loadRunnerControllerAdditionalAttributes,
-             String loadRunnerResultsFolder,
-             String loadRunnerAnalysisTemplateName,
-             String loadRunnerAnalysisHTMLReportFolder,
-             String loadRunnerResultsSummaryFile,
-             String loadRunnerResultsSummaryFileFormat, PrintStream logger) {
+        String loadRunnerControllerAdditionalAttributes,
+        String loadRunnerResultsFolder,
+        String loadRunnerAnalysisTemplateName,
+        String loadRunnerAnalysisHTMLReportFolder,
+        String loadRunnerResultsSummaryFile,
+        String loadRunnerResultsSummaryFileFormat, PrintStream logger) {
 		this.loadRunnerBin = loadRunnerBin;
 		this.loadRunnerScenario = loadRunnerScenario;
 		this.loadRunnerResultsFolder = loadRunnerResultsFolder;
