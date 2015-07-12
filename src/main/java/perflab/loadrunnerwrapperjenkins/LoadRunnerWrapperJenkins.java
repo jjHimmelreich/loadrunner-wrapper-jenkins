@@ -190,13 +190,24 @@ public class LoadRunnerWrapperJenkins extends Builder {
 			
 		}
 
-		public void init(String loadRunnerBin, String loadRunnerScenario,
+		public void init(
+                String buildNumber, String workspacePath,
+                String loadRunnerBin, String loadRunnerScenario,
 				String loadRunnerControllerAdditionalAttributes, String loadRunnerResultsFolder,
 				String loadRunnerAnalysisTemplateName, String loadRunnerAnalysisHTMLReportFolder,
 				String loadRunnerResultsSummaryFile, String loadRunnerResultsSummaryFileFormat,
                 ArrayList<LoadRunnerTransactionBoundary> reportTargetsValuesPerTransaction) {
-						
-			this.loadRunnerBin = loadRunnerBin;
+            
+            loadRunnerResultsFolder = interpolatePath(loadRunnerResultsFolder, "BUILD_NUMBER", buildNumber);
+            loadRunnerResultsFolder = interpolatePath(loadRunnerResultsFolder, "WORKSPACE", workspacePath);
+
+            loadRunnerAnalysisHTMLReportFolder = interpolatePath(loadRunnerAnalysisHTMLReportFolder, "BUILD_NUMBER", buildNumber);
+            loadRunnerAnalysisHTMLReportFolder = interpolatePath(loadRunnerAnalysisHTMLReportFolder, "WORKSPACE", workspacePath);
+
+            loadRunnerResultsSummaryFile = interpolatePath(loadRunnerResultsSummaryFile, "BUILD_NUMBER", buildNumber);
+            loadRunnerResultsSummaryFile = interpolatePath(loadRunnerResultsSummaryFile, "WORKSPACE", workspacePath);
+
+            this.loadRunnerBin = loadRunnerBin;
 	        this.loadRunnerScenario = loadRunnerScenario;
 	        this.loadRunnerResultsFolder = loadRunnerResultsFolder;
 	        this.loadRunnerAnalysisHTMLReportFolder = loadRunnerAnalysisHTMLReportFolder;
@@ -206,7 +217,21 @@ public class LoadRunnerWrapperJenkins extends Builder {
 	        this.loadRunnerResultsSummaryFileFormat = loadRunnerResultsSummaryFileFormat;
             this.reportTargetsValuesPerTransaction = reportTargetsValuesPerTransaction;
         }
-     }
+
+        private String interpolatePath(String pathToInterpolate, String pattern, String replacement) {
+
+            String dbgMessage = "Interpolating " + pathToInterpolate + " replace " + pattern + " with " + replacement;
+
+            String interpolatedString = pathToInterpolate;//.replaceAll("\\", "\\\\");
+
+            interpolatedString = interpolatedString.replaceAll("%"+pattern+"%", replacement);
+            interpolatedString = interpolatedString.replaceAll("\\$\\{"+pattern+"\\}", replacement);
+
+            Log.debug(dbgMessage + " = " + interpolatedString);
+
+            return interpolatedString;
+        }
+    }
     
     
     @Override
@@ -233,15 +258,9 @@ public class LoadRunnerWrapperJenkins extends Builder {
     		String buildNumber =  String.valueOf(build.getNumber());
     		String workspacePath = StringEscapeUtils.escapeJava(build.getWorkspace().toString());
 
-    		loadRunnerResultsFolder = interpolatePath(loadRunnerResultsFolder, "BUILD_NUMBER", buildNumber);
-    		loadRunnerAnalysisHTMLReportFolder = interpolatePath(loadRunnerAnalysisHTMLReportFolder, "BUILD_NUMBER", buildNumber);
-    		loadRunnerResultsSummaryFile = interpolatePath(loadRunnerResultsSummaryFile, "BUILD_NUMBER", buildNumber);
-    		
-    		loadRunnerResultsFolder = interpolatePath(loadRunnerResultsFolder, "WORKSPACE", workspacePath);
-    		loadRunnerAnalysisHTMLReportFolder = interpolatePath(loadRunnerAnalysisHTMLReportFolder, "WORKSPACE", workspacePath);
-    		loadRunnerResultsSummaryFile = interpolatePath(loadRunnerResultsSummaryFile, "WORKSPACE", workspacePath);		
-    		
-    		remoteLauncher.init(loadRunnerBin, 
+    		remoteLauncher.init(
+                    buildNumber, workspacePath,
+                    loadRunnerBin,
 					loadRunnerScenario, 
 					loadRunnerControllerAdditionalAttributes,
 					loadRunnerResultsFolder, 
@@ -265,20 +284,6 @@ public class LoadRunnerWrapperJenkins extends Builder {
 
         return okay;
     }
-
-    private String interpolatePath(String pathToInterpolate, String pattern, String replacement) {
-
-        String dbgMessage = "Interpolating " + pathToInterpolate + " replace " + pattern + " with " + replacement;
-
-    	String interpolatedString = pathToInterpolate;//.replaceAll("\\", "\\\\");
-    	
-		interpolatedString = interpolatedString.replaceAll("%"+pattern+"%", replacement);
-		interpolatedString = interpolatedString.replaceAll("\\$\\{"+pattern+"\\}", replacement);
-
-        Log.debug(dbgMessage + " = " + interpolatedString);
-
-		return interpolatedString;		
-	}
 
 	// Overridden for better type safety.
     // If your plugin doesn't really define any property on Descriptor,
