@@ -1,0 +1,4 @@
+* Define acceptable failed transactions percentage instead of Warning Level
+* Expose TPS in report
+* Expose global KPIs in report
+* Add History Viewer
