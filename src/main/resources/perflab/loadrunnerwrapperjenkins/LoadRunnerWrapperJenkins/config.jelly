@@ -45,13 +45,11 @@
   <f:entry>
 
     <table width="100%">
-      <col width="25%"/>
-      <col width="25%"/>
+      <col width="50%"/>
       <col width="25%"/>
       <col width="25%"/>
       <tr>
         <td>Transaction Name</td>
-        <td>Warning Level [sec]</td>
         <td>Error Level [sec]</td>
         <td>Skip it</td>
       </tr>
@@ -59,8 +57,7 @@
 
     <f:repeatable field="reportTargetsValuesPerTransaction" name="reportTargetsValuesPerTransaction">
       <table width="100%">
-        <col width="25%"/>
-        <col width="25%"/>
+        <col width="50%"/>
         <col width="25%"/>
         <col width="25%"/>
         <tr>
@@ -69,11 +66,7 @@
           </td>
 
           <td>
-            <f:number field="transactionWarningValue" name="transactionWarningValue" default="0.200"/>
-          </td>
-
-          <td>
-            <f:number field="transactionErrorValue" name="transactionErrorValue" default="0.300" />
+            <f:textbox field="transactionErrorValue" name="transactionErrorValue" default="0.300" />
           </td>
 
           <td align="center">

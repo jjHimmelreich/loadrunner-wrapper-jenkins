@@ -132,26 +132,13 @@ public class LoadRunnerWrapperJenkins extends Builder {
     	}
     	
   	  	private static final long serialVersionUID = 1L;
-        
+
+        // This code will run on the build slave
   	  	public String call() throws IOException {
         	final RemoteOutputStream ros = new RemoteOutputStream(listener.getLogger());
-            // This code will run on the build slave
-        	//Write on node console
-            /*System.out.println("loadRunnerBin = " + loadRunnerBin);
-            System.out.println("loadRunnerScenario = " + this.loadRunnerScenario);
-            System.out.println("loadRunnerResultsFolder = " + this.loadRunnerResultsFolder);
-            System.out.println("loadRunnerAnalysisHTMLReportFolder = " + this.loadRunnerAnalysisHTMLReportFolder);           
-            System.out.println("loadRunnerResultsSummaryFile = " + loadRunnerResultsSummaryFile);
-            System.out.println("loadRunnerResultsSummaryFileFormat = " + loadRunnerResultsSummaryFileFormat);
-
-            System.out.println("=================== KPIs ==================");
-            for(LoadRunnerTransactionBoundary kpi : reportTargetsValuesPerTransaction){
-                System.out.println("=====" + kpi.toString());
-            }*/
 
         	//Write on jenkins console
             ros.write("=============================================================\n".getBytes());
-            
             ros.write(("loadRunnerBin = " + loadRunnerBin+ "\n").getBytes());
             ros.write(("loadRunnerScenario = " + this.loadRunnerScenario+ "\n").getBytes());
             ros.write(("loadRunnerResultsFolder = " + this.loadRunnerResultsFolder+ "\n").getBytes());
@@ -163,9 +150,7 @@ public class LoadRunnerWrapperJenkins extends Builder {
             for(LoadRunnerTransactionBoundary kpi : reportTargetsValuesPerTransaction){
                 ros.write(("=====" + kpi.toString() + "\n").getBytes());
             }
-
-            //////// DEBUG ////////
-            // if(1==1){return String.valueOf(true);}
+            ros.write("=============================================================\n".getBytes());
 
             LoadRunnerWrapper loadRunner = new LoadRunnerWrapper(
                     this.loadRunnerBin,
@@ -227,8 +212,6 @@ public class LoadRunnerWrapperJenkins extends Builder {
             interpolatedString = interpolatedString.replaceAll("%"+pattern+"%", replacement);
             interpolatedString = interpolatedString.replaceAll("\\$\\{"+pattern+"\\}", replacement);
 
-            Log.debug(dbgMessage + " = " + interpolatedString);
-
             return interpolatedString;
         }
     }
@@ -236,14 +219,9 @@ public class LoadRunnerWrapperJenkins extends Builder {
     
     @Override
     public boolean perform(AbstractBuild build, Launcher launcher, BuildListener listener) {
-        // This is where you 'build' the project.
-        // Since this is a dummy, we just say 'hello world' and call that a build.
         boolean okay = true;
 
-
-
         // Get a "channel" to the loadrunner machine and run the task there
-
     	try {
     		LauncherCallable remoteLauncher = new LauncherCallable(listener);
     		
@@ -404,40 +382,31 @@ public class LoadRunnerWrapperJenkins extends Builder {
     // Fields in config.jelly must match the parameter names in the "DataBoundConstructor"
     public static class LoadRunnerTransactionBoundary extends AbstractDescribableImpl<LoadRunnerTransactionBoundary> {
         private final String transactionName;
-        private final int transactionWarningValue;
-        private final int transactionErrorValue;
+        private final float transactionErrorValue;
         private final boolean doNotCompare;
 
         @DataBoundConstructor
-        public LoadRunnerTransactionBoundary(final String transactionName, final int transactionWarningValue, final int transactionErrorValue, final boolean doNotCompare) {
+        public LoadRunnerTransactionBoundary(final String transactionName, final float transactionErrorValue, final boolean doNotCompare) {
             super();
             this.transactionName = transactionName;
-            this.transactionWarningValue = transactionWarningValue;
             this.transactionErrorValue = transactionErrorValue;
             this.doNotCompare = doNotCompare;
         }
 
         public boolean isDoNotCompare() {
-            return doNotCompare;
+            return this.doNotCompare;
         }
 
-        public int getTransactionErrorValue() {
-            return transactionErrorValue;
-        }
-
-        public int getTransactionWarningValue() {
-            return transactionWarningValue;
+        public float getTransactionErrorValue() {
+            return this.transactionErrorValue;
         }
 
         public String getTransactionName() {
-            return transactionName;
+            return this.transactionName;
         }
 
         public String toString(){
-            return  " transactionName=" + transactionName +
-                    " transactionWarningValue="+transactionWarningValue +
-                    " transactionErrorValue=" + transactionErrorValue +
-                    " doNotCompare=" + doNotCompare;
+            return  " transactionName=" + this.transactionName + " | transactionErrorValue=" + this.transactionErrorValue + " | doNotCompare=" + this.doNotCompare;
         }
 
         @Extension

@@ -126,6 +126,7 @@ public class LoadRunnerWrapper {
 		boolean lrsExists = checkIfScenarioExists();
         if(!lrsExists) {
             Log.error("Scenario file " + this.loadRunnerScenario + " was not found on slave. Aborting job");
+            logger.println("[ERROR] Scenario file " + this.loadRunnerScenario + " was not found on slave. Aborting job");
 
             okay = false;
             return okay;
@@ -139,7 +140,8 @@ public class LoadRunnerWrapper {
 		//Check if Analysis template exists
 		boolean analysisTemplateExists = checkIfTemplateExists();
         if(!analysisTemplateExists) {
-            Log.error("[ERROR] Scenario file " + this.loadRunnerScenario + " was not found on slave. Aborting job");
+            Log.error("Template file " + this.loadRunnerAnalysisTemplateName + " was not found on slave. Aborting job");
+            logger.println("[ERROR] Template file " + this.loadRunnerAnalysisTemplateName + " was not found on slave. Aborting job");
             okay = false;
             return okay;
         }
@@ -173,7 +175,6 @@ public class LoadRunnerWrapper {
 
             if(resultsFile.isEmpty()){
                 logger.println("[ERROR] Analysis session file (.lrr) was not  found in "+ loadRunnerResultsFolder + " folder. Aborting job");
-                System.out.println("[ERROR] Analysis session file (.lrr) was not  found in " + loadRunnerResultsFolder + " folder. Aborting job");
                 okay = false;
                 return okay;
             }
@@ -196,10 +197,11 @@ public class LoadRunnerWrapper {
 			okay = true;
 		} else {
             Log.error("Controller failed. Exit code is: " + controllerRC);
-			okay = false;
-		}
-		return okay;
-	}
+            logger.println("[ERROR] Controller failed. Exit code is: " + controllerRC);
+            okay = false;
+        }
+        return okay;
+    }
 
     /**
      * check if this.loadRunnerAnalysisTemplateName exists on filesystem
@@ -250,7 +252,6 @@ public class LoadRunnerWrapper {
                 if (!fileContent.contains(strToFind)){
                     okay  = false;
                     logger.println("[ERROR] " + fileName + ":" + strToFind + "  is missing or misconfigured . Aborting job");
-                    System.out.println("[ERROR] " + fileName + ":" + strToFind + "  is missing or misconfigured . Aborting job");
                 }
             }
         } catch (IOException e) {
@@ -347,7 +348,7 @@ public class LoadRunnerWrapper {
         } catch (IOException e) {
 
             e.printStackTrace();
-            logger.println("Can't write custom csv report for plotting " + e.getMessage());
+            logger.println("[ERROR] Can't write custom csv report for plotting " + e.getMessage());
         }
     }
 
@@ -366,7 +367,7 @@ public class LoadRunnerWrapper {
                     "[summary=Transactions statistics summary table]");
             Elements rows = table.select("tr");
 
-            logger.println("number of rows in summary file=" + rows.size());
+            logger.println("number of rows in summary file =" + rows.size());
 
             for (Element row : rows) {
 
@@ -382,14 +383,16 @@ public class LoadRunnerWrapper {
                     float maxRT = Float.valueOf(row.select("td[headers=LraMaximum]").select("span").text());
                     int passed = Integer.valueOf(row.select("td[headers=LraPass]").select("span").text().replace(".", "").replace(",", ""));
                     int failed = Integer.valueOf(row.select("td[headers=LraFail]").select("span").text().replace(".", "").replace(",", ""));
+                    int failedPrecentage = failed/(failed+passed)*100;
 
                     // logger.println("Saving Transaction [" + name + "]");
-                    this.transactions.add(new LoadRunnerTransaction(name, minRT, avgRT, maxRT, passed, failed));
+                    this.transactions.add(new LoadRunnerTransaction(name, minRT, avgRT, maxRT, passed, failed, failedPrecentage));
                 }
             }
 
         } catch (IOException e) {
             Log.error("Can't read LoadRunner Analysis html report " + e.getMessage());
+            logger.println("[ERROR] Can't read LoadRunner Analysis html report " + e.getMessage());
         }
 
     }
@@ -401,14 +404,14 @@ public class LoadRunnerWrapper {
      */
     private String generatejUnitReport(ArrayList<LoadRunnerTransaction> transactions,
                                        ArrayList<LoadRunnerWrapperJenkins.LoadRunnerTransactionBoundary> reportTargetsValuesPerTransaction) {
-        Log.info("Transformation to jUnit XML started ...");
+        logger.println("Transformation to jUnit XML started ...");
 
         String stringReport = "";
 
-
+        /* duplicated
         for(LoadRunnerWrapperJenkins.LoadRunnerTransactionBoundary kpi : reportTargetsValuesPerTransaction){
-            System.out.println("=====" + kpi.toString());
-        }
+            logger.println("=====" + kpi.toString());
+        }*/
 
         try {
 			/*
@@ -440,8 +443,7 @@ public class LoadRunnerWrapper {
 
                 String trName = tr.getName();
                 float trValue = tr.getAvgRT();
-
-                Log.info("Dump " + trName );
+                int trFailedPercentage = tr.getFailedPrecentage();
 
                 org.w3c.dom.Element testcaseElement = doc.createElement("testcase");
                 //testcaseElement.setAttribute("classname", tr.getName());
@@ -450,12 +452,17 @@ public class LoadRunnerWrapper {
                 testcaseElement.setAttribute("time", String.valueOf(trValue));
 
                 //TODO: evaluate values for transaction and add failure if needed
-                TRANSACTION_STATUS trStatus = calculateTransactionStatus(trName, trValue, reportTargetsValuesPerTransaction);
+                TRANSACTION_STATUS trStatus = calculateTransactionStatus(trName, trValue, trFailedPercentage, reportTargetsValuesPerTransaction);
                 switch(trStatus){
                     case ERROR:
+                        org.w3c.dom.Element errorElement = doc.createElement("error");
+                        errorElement.setAttribute("message","High precentage of failed transactions");
+                        errorElement.setTextContent("Amount of failed transactions is above limit - " + trFailedPercentage + "%");
+                        testcaseElement.appendChild(errorElement);
+                        break;
                     case FAILURE:
                         org.w3c.dom.Element failureElement = doc.createElement("failure");
-                        failureElement.setAttribute("message","high response time");
+                        failureElement.setAttribute("message","High response time");
                         failureElement.setTextContent("Average transaction response time is above limit");
                         testcaseElement.appendChild(failureElement);
                         break;
@@ -483,7 +490,7 @@ public class LoadRunnerWrapper {
         return stringReport;
     }
 
-    private TRANSACTION_STATUS calculateTransactionStatus(String trName, float trValue,
+    private TRANSACTION_STATUS calculateTransactionStatus(String trName, float trValue, int trFailedPercentage,
                                                           ArrayList<LoadRunnerWrapperJenkins.LoadRunnerTransactionBoundary> reportTargetsValuesPerTransaction) {
 
         TRANSACTION_STATUS status = TRANSACTION_STATUS.SUCCESS;
@@ -491,23 +498,19 @@ public class LoadRunnerWrapper {
 
         for( LoadRunnerWrapperJenkins.LoadRunnerTransactionBoundary target : reportTargetsValuesPerTransaction ){
             if(trName.equals(target.getTransactionName())){
-
-
                 if(target.isDoNotCompare() != true){
 
-                    logger.println("Checking: " + trName +
-                            " Warning after:" + target.getTransactionWarningValue() +
-                            " Error after:" + target.getTransactionErrorValue() );
+                    //Above failed transactions limit percentage
+                    if (trFailedPercentage > 10) {
+                        status = TRANSACTION_STATUS.FAILURE;
+                        break;
+                    }
+                    logger.println("Checking: " + trName + " Error after:" + target.getTransactionErrorValue() );
 
                     //Bigger then Error
                     if ( trValue >= target.getTransactionErrorValue()) {
                         status = TRANSACTION_STATUS.FAILURE;
-
-                    //Between Warning and Error
-                    }else if ( trValue > target.getTransactionWarningValue() && trValue < target.getTransactionErrorValue()) {
-                        status = TRANSACTION_STATUS.SUCCESS;
                     }
-
                 }else{
                     logger.println("Skipping evaluation of : " + trName );
 
@@ -657,9 +660,7 @@ public class LoadRunnerWrapper {
             // //////////////////////////////////////////////////////////////////////////
 
             for (LoadRunnerTransaction tr : this.transactions) {
-                // <006_My_Benefits unit="sec" mesure="0.115" isRelevant="yes"/>
                 String trName = "tr_" + tr.getName();
-                Log.info("Dump " + trName);
 
                 org.w3c.dom.Element trElement = doc.createElement(trName);
                 trElement.setAttribute("unit", "sec");
