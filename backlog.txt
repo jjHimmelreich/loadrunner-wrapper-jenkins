@@ -1,4 +1,7 @@
-* Define acceptable failed transactions percentage instead of Warning Level
+* Done: Define acceptable failed transactions percentage instead of Warning Level
 * Expose TPS in report
 * Expose global KPIs in report
-* Add History Viewer
+* Done: Add History Viewer
+* Add total tests duration form HTML report to testcase time
+* Global Jenkins configuration for percentage failures, max response time ...
+*

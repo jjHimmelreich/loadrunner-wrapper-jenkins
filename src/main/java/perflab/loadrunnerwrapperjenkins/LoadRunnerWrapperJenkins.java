@@ -20,6 +20,7 @@ import org.kohsuke.stapler.QueryParameter;
 import org.kohsuke.stapler.StaplerRequest;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.ArrayList;
 
 import javax.servlet.ServletException;
@@ -380,7 +381,7 @@ public class LoadRunnerWrapperJenkins extends Builder {
     }
 
     // Fields in config.jelly must match the parameter names in the "DataBoundConstructor"
-    public static class LoadRunnerTransactionBoundary extends AbstractDescribableImpl<LoadRunnerTransactionBoundary> {
+    public static class LoadRunnerTransactionBoundary extends AbstractDescribableImpl<LoadRunnerTransactionBoundary> implements Serializable{
         private final String transactionName;
         private final float transactionErrorValue;
         private final boolean doNotCompare;
