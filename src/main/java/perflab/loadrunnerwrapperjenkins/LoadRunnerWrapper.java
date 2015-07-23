@@ -52,6 +52,7 @@ public class LoadRunnerWrapper {
 	private String loadRunnerControllerAdditionalAttributes;
 	private String loadRunnerResultsSummaryFileFormat;
 	private ArrayList<LoadRunnerTransaction> transactions = new ArrayList<LoadRunnerTransaction>();
+    private int acceptedFailurePercentage;
     private ArrayList<LoadRunnerWrapperJenkins.LoadRunnerTransactionBoundary> reportTargetsValuesPerTransaction;
 	private Date startTime;
 	private PrintStream logger;
@@ -71,6 +72,7 @@ public class LoadRunnerWrapper {
      * @param loadRunnerAnalysisHTMLReportFolder
      * @param loadRunnerResultsSummaryFile
      * @param loadRunnerResultsSummaryFileFormat
+     * @param acceptedFailurePercentage
      * @param reportTargetsValuesPerTransaction
      */
 	public LoadRunnerWrapper(String loadRunnerBin, String loadRunnerScenario,
@@ -81,6 +83,7 @@ public class LoadRunnerWrapper {
                              String loadRunnerResultsSummaryFile,
                              String loadRunnerResultsSummaryFileFormat,
                              ArrayList<LoadRunnerWrapperJenkins.LoadRunnerTransactionBoundary> reportTargetsValuesPerTransaction,
+                             int acceptedFailurePercentage,
                              PrintStream logger)
 	{
 
@@ -92,6 +95,7 @@ public class LoadRunnerWrapper {
 		this.loadRunnerControllerAdditionalAttributes = loadRunnerControllerAdditionalAttributes;
 		this.loadRunnerAnalysisTemplateName = loadRunnerAnalysisTemplateName;
 		this.loadRunnerResultsSummaryFileFormat = loadRunnerResultsSummaryFileFormat;
+        this.acceptedFailurePercentage = acceptedFailurePercentage;
         this.reportTargetsValuesPerTransaction = reportTargetsValuesPerTransaction;
 		this.logger = logger;
         LRSFlags = new HashMap<String, Pair>();
@@ -451,7 +455,6 @@ public class LoadRunnerWrapper {
                 testcaseElement.setAttribute("name", trName);
                 testcaseElement.setAttribute("time", String.valueOf(trValue));
 
-                //TODO: evaluate values for transaction and add failure if needed
                 TRANSACTION_STATUS trStatus = calculateTransactionStatus(trName, trValue, trFailedPercentage, reportTargetsValuesPerTransaction);
                 switch(trStatus){
                     case ERROR:
@@ -501,8 +504,8 @@ public class LoadRunnerWrapper {
                 if(target.isDoNotCompare() != true){
 
                     //Above failed transactions limit percentage
-                    if (trFailedPercentage > 10) {
-                        status = TRANSACTION_STATUS.FAILURE;
+                    if (trFailedPercentage > this.acceptedFailurePercentage) {
+                        status = TRANSACTION_STATUS.ERROR;
                         break;
                     }
                     logger.println("Checking: " + trName + " Error after:" + target.getTransactionErrorValue() );

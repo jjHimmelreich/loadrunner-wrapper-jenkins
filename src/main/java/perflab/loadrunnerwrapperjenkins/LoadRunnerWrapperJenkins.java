@@ -24,6 +24,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 
 import javax.servlet.ServletException;
+import net.sf.json.JSONObject;
 
 /**
  * <p>
@@ -127,6 +128,7 @@ public class LoadRunnerWrapperJenkins extends Builder {
 		private String loadRunnerAnalysisTemplateName;
 		private String loadRunnerResultsSummaryFileFormat;
         private ArrayList<LoadRunnerTransactionBoundary> reportTargetsValuesPerTransaction;
+        private int acceptedFailurePercentage;
 
         public LauncherCallable(BuildListener listener){
     		this.listener = listener;    		
@@ -163,6 +165,7 @@ public class LoadRunnerWrapperJenkins extends Builder {
             		this.loadRunnerResultsSummaryFile,
             		this.loadRunnerResultsSummaryFileFormat,
                     reportTargetsValuesPerTransaction,
+                    this.acceptedFailurePercentage,
             		this.listener.getLogger());
  
             boolean okay = loadRunner.execute();
@@ -182,7 +185,8 @@ public class LoadRunnerWrapperJenkins extends Builder {
 				String loadRunnerControllerAdditionalAttributes, String loadRunnerResultsFolder,
 				String loadRunnerAnalysisTemplateName, String loadRunnerAnalysisHTMLReportFolder,
 				String loadRunnerResultsSummaryFile, String loadRunnerResultsSummaryFileFormat,
-                ArrayList<LoadRunnerTransactionBoundary> reportTargetsValuesPerTransaction) {
+                ArrayList<LoadRunnerTransactionBoundary> reportTargetsValuesPerTransaction,
+                int acceptedFailurePercentage) {
             
             loadRunnerResultsFolder = interpolatePath(loadRunnerResultsFolder, "BUILD_NUMBER", buildNumber);
             loadRunnerResultsFolder = interpolatePath(loadRunnerResultsFolder, "WORKSPACE", workspacePath);
@@ -202,6 +206,7 @@ public class LoadRunnerWrapperJenkins extends Builder {
 	        this.loadRunnerAnalysisTemplateName = loadRunnerAnalysisTemplateName;	
 	        this.loadRunnerResultsSummaryFileFormat = loadRunnerResultsSummaryFileFormat;
             this.reportTargetsValuesPerTransaction = reportTargetsValuesPerTransaction;
+            this.acceptedFailurePercentage = acceptedFailurePercentage;
         }
 
         private String interpolatePath(String pathToInterpolate, String pattern, String replacement) {
@@ -221,6 +226,8 @@ public class LoadRunnerWrapperJenkins extends Builder {
     @Override
     public boolean perform(AbstractBuild build, Launcher launcher, BuildListener listener) {
         boolean okay = true;
+
+        int acceptedFailurePercentage = getDescriptor().getAcceptedFailurePercentage();
 
         // Get a "channel" to the loadrunner machine and run the task there
     	try {
@@ -247,7 +254,8 @@ public class LoadRunnerWrapperJenkins extends Builder {
 					loadRunnerAnalysisHTMLReportFolder, 
 					loadRunnerResultsSummaryFile,
 					loadRunnerResultsSummaryFileFormat,
-                    reportTargetsValuesPerTransaction);
+                    reportTargetsValuesPerTransaction,
+                    acceptedFailurePercentage);
     		
     		String okayString = launcher.getChannel().call(remoteLauncher);    		
 
@@ -289,7 +297,8 @@ public class LoadRunnerWrapperJenkins extends Builder {
          * <p>
          * If you don't want fields to be persisted, use <tt>transient</tt>.
          */
-        //private boolean useFrench;
+        private int acceptedFailurePercentage;
+        private float defaultTransactionErrorValue;
 
         /**
          * In order to load the persisted global configuration, you have to 
@@ -310,6 +319,31 @@ public class LoadRunnerWrapperJenkins extends Builder {
         public String getDisplayName() {
             return "perflab:HP LoadRunner Wrapper";
         }
+
+        @Override
+        public boolean configure(StaplerRequest staplerRequest, JSONObject json) throws FormException {
+            // to persist global configuration information,
+            // set that to properties and call save().
+            acceptedFailurePercentage = json.getInt("acceptedFailurePercentage");
+            defaultTransactionErrorValue = json.getInt("defaultTransactionErrorValue");
+            save();
+            return true; // indicate that everything is good so far
+        }
+
+        /**
+         * This method returns accepted failure percentage from the global configuration
+         */
+        public int getAcceptedFailurePercentage() {
+            return acceptedFailurePercentage;
+        }
+
+        /**
+         * This method returns default Transaction Error Value from the global configuration
+         */
+        public float getDefaultTransactionErrorValue() {
+            return defaultTransactionErrorValue;
+        }
+
 
         /**
          * Performs on-the-fly validation of the form fields.

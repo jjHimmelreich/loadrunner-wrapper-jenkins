@@ -12,10 +12,14 @@
     tags they use. Views are always organized according to its owner class,
     so it should be straightforward to find them.
   -->
-  <f:section title="perflab:HP LoadRunner Wrapper">
-    <f:entry title="French" field="useFrench"
-      description="Check if we should say hello in French">
-      <f:checkbox />
+  <f:section title="perflab:HP LoadRunner Wrapper"> transactionErrorValue
+    <f:entry title="Accepted Failure Percentage" field="acceptedFailurePercentage"
+      description="If test has failed transactions above this limit then the test ends with error">
+      <f:textbox default="10"/>
     </f:entry>
+    <f:entry title="Default Transaction Error Value" field="defaultTransactionErrorValue"
+          description="if transaction response time is above this value and no alternative limit was set then the test ends with error">
+          <f:textbox default="0.5"/>
+        </f:entry>
   </f:section>
 </j:jelly>
