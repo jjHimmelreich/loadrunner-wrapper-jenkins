@@ -79,4 +79,5 @@ public class LoadRunnerTransaction {
 	public int getFailedPrecentage() { return failedPrecentage;	}
 
 	public void setFailedPrecentage(int failedPrecentage) {	this.failedPrecentage = failedPrecentage;}
+	
 }

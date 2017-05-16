@@ -25,9 +25,11 @@ import org.jfree.util.Log;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.jsoup.parser.Parser;
 import org.jsoup.select.Elements;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.filefilter.WildcardFileFilter;
+import org.apache.commons.lang.StringUtils;
 
 import java.io.File;
 import java.util.HashMap;
@@ -345,8 +347,8 @@ public class LoadRunnerWrapper {
 
         try {
 
+            logger.println(summaryString);
             FileUtils.writeStringToFile(new File(loadRunnerResultsSummaryFile), summaryString);
-            //logger.println(summaryString);
             logger.println("Report is saved to " + loadRunnerResultsSummaryFile);
 
         } catch (IOException e) {
@@ -367,29 +369,24 @@ public class LoadRunnerWrapper {
             File input = new File(htmlSummaryFile);
             Document document = Jsoup.parse(input, "UTF-8");
             Document parse = Jsoup.parse(document.html());
-            Elements table = parse.select("table").select(
-                    "[summary=Transactions statistics summary table]");
+            Elements table = parse.select("table").select("[summary=Transactions statistics summary table]");
             Elements rows = table.select("tr");
 
             logger.println("number of rows in summary file =" + rows.size());
 
-            for (Element row : rows) {
+            for (Element row : rows) {       
+                String name = extractText(row, "td[headers^=LraTransaction Name]");
+                
+                if (!name.isEmpty() && !name.equals("None")) {
 
-                // logger.println("table element = " + row.toString());
-
-                String name = row.select("td[headers=LraTransaction Name]")
-                        .select("span").text();
-
-                if (!name.isEmpty()) {
-
-                    float avgRT = Float.valueOf(row.select("td[headers=LraAverage]").select("span").text());
-                    float minRT = Float.valueOf(row.select("td[headers=LraMinimum]").select("span").text());
-                    float maxRT = Float.valueOf(row.select("td[headers=LraMaximum]").select("span").text());
-                    int passed = Integer.valueOf(row.select("td[headers=LraPass]").select("span").text().replace(".", "").replace(",", ""));
-                    int failed = Integer.valueOf(row.select("td[headers=LraFail]").select("span").text().replace(".", "").replace(",", ""));
+                    float avgRT = Float.valueOf(extractText(row, "td[headers^=LraMinimum]"));
+                    float minRT = Float.valueOf(extractText(row, "td[headers^=LraMinimum]"));
+                    float maxRT = Float.valueOf(extractText(row, "td[headers^=LraMaximum]"));
+                    int passed = Integer.valueOf(extractText(row, "td[headers^=LraPass]").replace(".", "").replace(",", ""));
+                    int failed = Integer.valueOf(extractText(row, "td[headers^=LraFail]").replace(".", "").replace(",", ""));
                     int failedPrecentage = failed/(failed+passed)*100;
 
-                    // logger.println("Saving Transaction [" + name + "]");
+                    logger.println("Saving Transaction name="+name+" | minRT = "+minRT+" | avgRT="+avgRT+" | maxRT="+maxRT+" | passed="+passed+" | failed="+failed+" | failedPrecentage="+failedPrecentage+"");
                     this.transactions.add(new LoadRunnerTransaction(name, minRT, avgRT, maxRT, passed, failed, failedPrecentage));
                 }
             }
@@ -401,12 +398,28 @@ public class LoadRunnerWrapper {
 
     }
 
-    /**
+	private String extractText(Element row, String selector) {
+		String result = row.select(selector).select("span").text();
+		result = result.replaceAll("&nbsp;","");
+		result = result.replaceAll("\u00A0", "");
+		result = result.trim();
+		return result;
+	}
+
+	public void setLoadRunnerResultsSummaryFileFormat(String loadRunnerResultsSummaryFileFormat) {
+		this.loadRunnerResultsSummaryFileFormat = loadRunnerResultsSummaryFileFormat;
+	}
+	
+	public ArrayList<LoadRunnerTransaction> getTransactions() {
+		return transactions;
+	}
+
+	/**
      * @return
      * @param transactions
      * @param reportTargetsValuesPerTransaction
      */
-    private String generatejUnitReport(ArrayList<LoadRunnerTransaction> transactions,
+    protected String generatejUnitReport(ArrayList<LoadRunnerTransaction> transactions,
                                        ArrayList<LoadRunnerWrapperJenkins.LoadRunnerTransactionBoundary> reportTargetsValuesPerTransaction) {
         logger.println("Transformation to jUnit XML started ...");
 
@@ -459,13 +472,13 @@ public class LoadRunnerWrapper {
                 switch(trStatus){
                     case ERROR:
                         org.w3c.dom.Element errorElement = doc.createElement("error");
-                        errorElement.setAttribute("message","High precentage of failed transactions");
+                        errorElement.setAttribute("message","Precentage of failed transactions is above " + trFailedPercentage);
                         errorElement.setTextContent("Amount of failed transactions is above limit - " + trFailedPercentage + "%");
                         testcaseElement.appendChild(errorElement);
                         break;
                     case FAILURE:
                         org.w3c.dom.Element failureElement = doc.createElement("failure");
-                        failureElement.setAttribute("message","High response time");
+                        failureElement.setAttribute("message","Response time is above " + getTargetValueByTransactionName(trName, reportTargetsValuesPerTransaction));
                         failureElement.setTextContent("Average transaction response time is above limit");
                         testcaseElement.appendChild(failureElement);
                         break;
@@ -493,6 +506,19 @@ public class LoadRunnerWrapper {
         return stringReport;
     }
 
+	private float getTargetValueByTransactionName(String trName, ArrayList<LoadRunnerWrapperJenkins.LoadRunnerTransactionBoundary> reportTargetsValuesPerTransaction){
+		float transactionErrorValue = -1;
+		
+		for( LoadRunnerWrapperJenkins.LoadRunnerTransactionBoundary target : reportTargetsValuesPerTransaction ){
+			if(trName.equals(target.getTransactionName())){
+				transactionErrorValue = target.getTransactionErrorValue();
+				break;
+            }
+        }
+
+        return transactionErrorValue;
+	}
+	
     private TRANSACTION_STATUS calculateTransactionStatus(String trName, float trValue, int trFailedPercentage,
                                                           ArrayList<LoadRunnerWrapperJenkins.LoadRunnerTransactionBoundary> reportTargetsValuesPerTransaction) {
 
