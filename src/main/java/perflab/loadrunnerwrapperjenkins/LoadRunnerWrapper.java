@@ -379,7 +379,7 @@ public class LoadRunnerWrapper {
                 
                 if (!name.isEmpty() && !name.equals("None")) {
 
-                    float avgRT = Float.valueOf(extractText(row, "td[headers^=LraMinimum]"));
+                    float avgRT = Float.valueOf(extractText(row, "td[headers^=LraAverage]"));
                     float minRT = Float.valueOf(extractText(row, "td[headers^=LraMinimum]"));
                     float maxRT = Float.valueOf(extractText(row, "td[headers^=LraMaximum]"));
                     int passed = Integer.valueOf(extractText(row, "td[headers^=LraPass]").replace(".", "").replace(",", ""));

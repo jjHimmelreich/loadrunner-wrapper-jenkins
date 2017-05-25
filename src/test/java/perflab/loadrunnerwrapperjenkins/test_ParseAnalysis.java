@@ -58,15 +58,30 @@ public class test_ParseAnalysis extends TestCase {
 		
 		Assert.assertEquals(12, transactions.size());
 		
-		LoadRunnerTransaction tr = transactions.get(3);
-		Assert.assertEquals(tr.getName(),"GIT_Fetch");
-		Assert.assertEquals(tr.getMinRT(),0.411f, 0);
-		Assert.assertEquals(tr.getMaxRT(),0.411f, 0);	
+		LoadRunnerTransaction tr = transactions.get(5);
+		Assert.assertEquals("Search_a_300_Results", tr.getName());
+		Assert.assertEquals(0.346f, tr.getMinRT(), 0);
+		Assert.assertEquals(0.442f, tr.getMaxRT(), 0);	
+		Assert.assertEquals(0.394f, tr.getAvgRT(), 0);	
 		
-		String expectedReport = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><testsuite tests=\"12\"><testcase classname=\"load.\" name=\"001_SAML\" time=\"0.248\"/><testcase classname=\"load.\" name=\"002_Logon_SDN\" time=\"0.199\"/><testcase classname=\"load.\" name=\"GIT_Commit\" time=\"0.856\"/><testcase classname=\"load.\" name=\"GIT_Fetch\" time=\"0.411\"/><testcase classname=\"load.\" name=\"IDE_Reload\" time=\"8.573\"/><testcase classname=\"load.\" name=\"Search_a_300_Results\" time=\"0.346\"/><testcase classname=\"load.\" name=\"Search_GUID\" time=\"0.046\"/><testcase classname=\"load.\" name=\"Update_User_Preferences\" time=\"0.024\"/><testcase classname=\"load.\" name=\"WM_Create_File\" time=\"0.265\"/><testcase classname=\"load.\" name=\"WM_Delete_File\" time=\"0.227\"/><testcase classname=\"load.\" name=\"WM_Read_File\" time=\"0.038\"/><testcase classname=\"load.\" name=\"WM_Save_1_File\" time=\"0.242\"/></testsuite>";
+		String expectedReport = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"+
+								"<testsuite tests=\"12\">"+
+								"<testcase classname=\"load.\" name=\"001_SAML\" time=\"0.314\"/>"+
+								"<testcase classname=\"load.\" name=\"002_Logon_SDN\" time=\"0.213\"/>"+
+								"<testcase classname=\"load.\" name=\"GIT_Commit\" time=\"0.856\"/>"+
+								"<testcase classname=\"load.\" name=\"GIT_Fetch\" time=\"0.411\"/>"+
+								"<testcase classname=\"load.\" name=\"IDE_Reload\" time=\"8.573\"/>"+
+								"<testcase classname=\"load.\" name=\"Search_a_300_Results\" time=\"0.394\"/>"+
+								"<testcase classname=\"load.\" name=\"Search_GUID\" time=\"0.048\"/>"+
+								"<testcase classname=\"load.\" name=\"Update_User_Preferences\" time=\"0.044\"/>"+
+								"<testcase classname=\"load.\" name=\"WM_Create_File\" time=\"0.462\"/>"+
+								"<testcase classname=\"load.\" name=\"WM_Delete_File\" time=\"0.586\"/>"+
+								"<testcase classname=\"load.\" name=\"WM_Read_File\" time=\"0.052\"/>"+
+								"<testcase classname=\"load.\" name=\"WM_Save_1_File\" time=\"0.313\"/>"+
+								"</testsuite>";
 		String junitXMLReport = lrw.generatejUnitReport(transactions, reportTargetsValuesPerTransaction);
 		
-		Assert.assertEquals(junitXMLReport, expectedReport);
+		Assert.assertEquals(expectedReport, junitXMLReport);
 	}
 	
 	@Test
@@ -108,14 +123,33 @@ public class test_ParseAnalysis extends TestCase {
 		Assert.assertEquals(15, transactions.size());
 		
 		LoadRunnerTransaction tr = transactions.get(1);
-		Assert.assertEquals(tr.getName(),"002_Logon_SDN");
-		Assert.assertEquals(tr.getMinRT(),0.17f, 0);
-		Assert.assertEquals(tr.getMaxRT(),0.376f, 0);
+		Assert.assertEquals("002_Logon_SDN", tr.getName());
+		Assert.assertEquals(0.17f,  tr.getMinRT(), 0);
+		Assert.assertEquals(0.376f, tr.getMaxRT(), 0);
+		Assert.assertEquals(0.179f, tr.getAvgRT(), 0);
 		
-		String expectedReport = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><testsuite tests=\"15\"><testcase classname=\"load.\" name=\"001_SAML\" time=\"0.247\"/><testcase classname=\"load.\" name=\"002_Logon_SDN\" time=\"0.17\"/><testcase classname=\"load.\" name=\"GIT_Commit\" time=\"0.398\"/><testcase classname=\"load.\" name=\"GIT_Fetch\" time=\"0.3\"/><testcase classname=\"load.\" name=\"GIT_Rebase\" time=\"0.37\"/><testcase classname=\"load.\" name=\"IDE_Reload\" time=\"4.178\"/><testcase classname=\"load.\" name=\"Preview_Run_WebApp\" time=\"0.066\"/><testcase classname=\"load.\" name=\"Renew Token - 403\" time=\"0.024\"/><testcase classname=\"load.\" name=\"Search_a_300_Results\" time=\"0.283\"/><testcase classname=\"load.\" name=\"Search_GUID\" time=\"0.021\"/><testcase classname=\"load.\" name=\"Update_User_Preferences\" time=\"0.021\"/><testcase classname=\"load.\" name=\"WM_Create_File\" time=\"0.184\"/><testcase classname=\"load.\" name=\"WM_Delete_File\" time=\"0.116\"/><testcase classname=\"load.\" name=\"WM_Read_File\" time=\"0.032\"/><testcase classname=\"load.\" name=\"WM_Save_1_File\" time=\"0.148\"/></testsuite>";
+		String expectedReport = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"+
+								"<testsuite tests=\"15\">"+
+								"<testcase classname=\"load.\" name=\"001_SAML\" time=\"0.26\"/>"+
+								"<testcase classname=\"load.\" name=\"002_Logon_SDN\" time=\"0.179\"/>"+
+								"<testcase classname=\"load.\" name=\"GIT_Commit\" time=\"0.685\"/>"+
+								"<testcase classname=\"load.\" name=\"GIT_Fetch\" time=\"0.389\"/>"+
+								"<testcase classname=\"load.\" name=\"GIT_Rebase\" time=\"0.599\"/>"+
+								"<testcase classname=\"load.\" name=\"IDE_Reload\" time=\"7.277\"/>"+
+								"<testcase classname=\"load.\" name=\"Preview_Run_WebApp\" time=\"0.116\"/>"+
+								"<testcase classname=\"load.\" name=\"Renew Token - 403\" time=\"0.028\"/>"+
+								"<testcase classname=\"load.\" name=\"Search_a_300_Results\" time=\"0.4\"/>"+
+								"<testcase classname=\"load.\" name=\"Search_GUID\" time=\"0.061\"/>"+
+								"<testcase classname=\"load.\" name=\"Update_User_Preferences\" time=\"0.058\"/>"+
+								"<testcase classname=\"load.\" name=\"WM_Create_File\" time=\"0.349\"/>"+
+								"<testcase classname=\"load.\" name=\"WM_Delete_File\" time=\"0.267\"/>"+
+								"<testcase classname=\"load.\" name=\"WM_Read_File\" time=\"0.062\"/>"+
+								"<testcase classname=\"load.\" name=\"WM_Save_1_File\" time=\"0.309\"/>"+
+								"</testsuite>";
+		
 		String junitXMLReport = lrw.generatejUnitReport(transactions, reportTargetsValuesPerTransaction);
 		
-		Assert.assertEquals(junitXMLReport, expectedReport);
+		Assert.assertEquals(expectedReport, junitXMLReport);
 		
 	}
 	
