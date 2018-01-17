@@ -1,0 +1,58 @@
+package perflab.loadrunnerwrapperjenkins;
+
+import static org.junit.Assert.*;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.concurrent.ExecutionException;
+
+import org.apache.commons.io.FileUtils;
+import org.junit.Rule;
+import org.junit.Test;
+import org.jvnet.hudson.test.JenkinsRule;
+
+import hudson.model.FreeStyleBuild;
+import hudson.model.FreeStyleProject;
+import junit.framework.TestCase;
+
+
+public class test_projectTest extends TestCase {
+	@Rule public JenkinsRule j = new JenkinsRule();
+	private File resourcesDirectory = new File("src/test/resources");
+	
+	@Test
+	public void test() throws InterruptedException, ExecutionException, IOException {
+		FreeStyleProject project = j.createFreeStyleProject();
+		
+		String loadRunnerBin = "C:\\Program Files (x86)\\HP\\LoadRunner\\bin"; 
+		String loadRunnerScenario = "C:\\Program Files (x86)\\HP\\LoadRunner\\scenario\\App-Registry.lrs"; resourcesDirectory.getAbsolutePath().concat("\\11.52\\An_Report1\\summary.html");
+		String loadRunnerControllerAdditionalAttributes = ""; 
+		String loadRunnerResultsFolder = "%WORKSPACE%\\%BUILD_NUMBER%"; 
+		String loadRunnerAnalysisTemplateName = "DefaultTemplate1"; 
+		String loadRunnerAnalysisHTMLReportFolder = "%WORKSPACE%\\%BUILD_NUMBER%\\An_Report1"; 
+		String loadRunnerResultsSummaryFile = ""; 
+		String loadRunnerResultsSummaryFileFormat = ""; 
+		ArrayList<LoadRunnerWrapperJenkins.LoadRunnerTransactionBoundary> reportTargetsValuesPerTransaction = new ArrayList<LoadRunnerWrapperJenkins.LoadRunnerTransactionBoundary>();
+		
+		project.getBuildersList().add(new LoadRunnerWrapperJenkins(loadRunnerBin, 
+																   loadRunnerScenario, 
+																   loadRunnerResultsFolder, 
+																   loadRunnerAnalysisTemplateName, 
+																   loadRunnerAnalysisHTMLReportFolder, 
+																   loadRunnerResultsSummaryFile, 
+																   loadRunnerControllerAdditionalAttributes, 
+																   loadRunnerResultsSummaryFileFormat, 
+																   reportTargetsValuesPerTransaction));
+		
+		FreeStyleBuild build = project.scheduleBuild2(0).get();
+		
+		String s = FileUtils.readFileToString(build.getLogFile());
+		
+		System.err.println("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n" + s + "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n");
+		
+		assertTrue(s.contains("aaa1"));	
+			
+	}
+
+}
