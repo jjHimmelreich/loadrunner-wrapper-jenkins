@@ -15,7 +15,7 @@
 	</parent>
 	<groupId>perflab</groupId>
 	<artifactId>hp-loadrunner-wrapper</artifactId>
-	<version>1.5-SNAPSHOT</version>
+	<version>1.6</version>
 	<packaging>hpi</packaging>
 
 	<name>HP LoadRunner Wrapper Plugin</name>
