@@ -268,12 +268,12 @@ public class LoadRunnerWrapper {
 		return okay;
 	}
 
-	/**
+/*	*//**
 	 * Looing for .lrr file ion results folder
 	 * 
 	 * param resultsFolder
 	 * return name of lrr file name in results folder
-	 */
+	 *//*
 	private String getResultsFile(String resultsFolder) {
 
 		logger.println("Looking for lrr file in " + resultsFolder);
@@ -283,11 +283,11 @@ public class LoadRunnerWrapper {
 		return lrrFile;
 	}
 
-	/**
+	*//**
 	 * param path
 	 * param pattern
 	 * return first file according to the pattern
-	 */
+	 *//*
 	private String findFilebyRegex(String path, String pattern) {
 		String foundFile = "";
 
@@ -309,12 +309,12 @@ public class LoadRunnerWrapper {
 			logger.println("Can't find lrr file " + e.getMessage());
 		}
 		return foundFile;
-	}
+	}*/
 
 	/**
 	 * param command - command to execute
 	 * return command exit code
-	 */
+	 *//*
 	private int runCommand(String command) {
 		int exitCode = -1;
 
@@ -330,14 +330,14 @@ public class LoadRunnerWrapper {
 
 		// getLog().info("Exit value: " + exitCode);
 		return exitCode;
-	}
+	}*/
 
 	/**
 	 * Generates report in format expected by
 	 * https://wiki.jenkins-ci.org/display/JENKINS/PerfPublisher+Plugin examples
 	 * here: file:///C:/Users/i046774/Downloads/master-s-thesis-designing-and-
 	 * automating-dynamic-testing-of-software-nightly-builds.pdf
-	 */
+	 *//*
 	protected void extractKPIs(String resultsFolder, String htmlReportFolder) {
 
 		String summaryString = "";
@@ -363,7 +363,7 @@ public class LoadRunnerWrapper {
 			e.printStackTrace();
 			logger.println("[ERROR] Can't write custom csv report for plotting " + e.getMessage());
 		}
-	}
+	}*/
 
 	/**
 	 * param htmlSummaryFile - load runner analysis html report file to parse
@@ -406,16 +406,16 @@ public class LoadRunnerWrapper {
 			Log.error("Can't read LoadRunner Analysis html report " + e.getMessage());
 			logger.println("[ERROR] Can't read LoadRunner Analysis html report " + e.getMessage());
 		}
-
-                if (!fileContent.contains(strToFind)){
+		
+        /*if (!fileContent.contains(strToFind)){
                     okay  = false;
                     logger.println("[ERROR] " + fileName + ":" + strToFind + "  is missing or misconfigured . Aborting job");
                 }
             }
         } catch (IOException e) {
             e.printStackTrace();
-        }
-        return okay;
+        }*/
+        //return okay;
     }
 
     /**
@@ -515,7 +515,7 @@ public class LoadRunnerWrapper {
      * @param summaryFile     - location of summary file to be generated out of loadrunner
      *                        html analysis
      */
-    protected void parseSummaryFile(String htmlSummaryFile, String summaryFile) {
+   /* protected void parseSummaryFile(String htmlSummaryFile, String summaryFile) {
         try {
 
             File input = new File(htmlSummaryFile);
@@ -550,7 +550,7 @@ public class LoadRunnerWrapper {
 
     }
 
-	private String extractText(Element row, String selector) {
+*/	private String extractText(Element row, String selector) {
 		String result = row.select(selector).select("span").text();
 		result = result.replaceAll("&nbsp;", "");
 		result = result.replaceAll("\u00A0", "");
@@ -563,6 +563,7 @@ public class LoadRunnerWrapper {
 	}
 
 	public ArrayList<LoadRunnerTransaction> getTransactions() {
+		logger.println("Transformations num" + transactions);
 		return transactions;
 	}
 
@@ -606,12 +607,23 @@ public class LoadRunnerWrapper {
 			doc.appendChild(testsuiteElement);
 
 			// //////////////////////////////////////////////////////////////////////////
-
+			logger.println("Before For transactions ...");
+			
+			
 			for (LoadRunnerTransaction tr : transactions) {
 
 				String trName = tr.getName();
+				logger.println("getName(); ..." + trName);
+				logger.println("getName(); ..." + transactions.toString());
+				
 				float trValue = tr.getAvgRT();
 				int trFailedPercentage = tr.getFailedPrecentage();
+				
+				float trmaxRTValue = tr.getMaxRT();
+				float trminRTValue = tr.getMinRT();
+				int trPassed = tr.getPassed();
+				int trFailed = tr.getFailed();
+				
 
 				org.w3c.dom.Element testcaseElement = doc.createElement("testcase");
 				// testcaseElement.setAttribute("classname", tr.getName());
@@ -619,6 +631,11 @@ public class LoadRunnerWrapper {
 						"load." + new File(loadRunnerScenario).getName().replace(".lrs", ""));
 				testcaseElement.setAttribute("name", trName);
 				testcaseElement.setAttribute("time", String.valueOf(trValue));
+				
+				testcaseElement.setAttribute("maxtime", String.valueOf(trmaxRTValue));
+				testcaseElement.setAttribute("mintime", String.valueOf(trminRTValue));
+				testcaseElement.setAttribute("Passed", String.valueOf(trPassed));
+				testcaseElement.setAttribute("Failed", String.valueOf(trFailed));
 
 				TRANSACTION_STATUS trStatus = calculateTransactionStatus(trName, trValue, trFailedPercentage,
 						reportTargetsValuesPerTransaction);
